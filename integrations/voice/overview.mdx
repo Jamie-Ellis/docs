@@ -1,0 +1,308 @@
+---
+title: "Voice Integration Overview"
+description: "Retell AI voice agent integration for automated call handling"
+---
+
+## Overview
+
+Juryo integrates with Retell AI to provide intelligent voice agent capabilities. Calls are automatically answered, analyzed, and converted into opportunities with complete transcripts and insights.
+
+<Info>
+**Key Capabilities**
+- Automated call answering 24/7
+- Real-time conversation transcription
+- AI-powered lead qualification
+- Automatic contact and opportunity creation
+- Call analytics and success tracking
+- Integration with Zapier for failed calls
+</Info>
+
+## How It Works
+
+### Call Flow
+
+```
+Client calls → Retell AI Agent → Conversation happens
+                       ↓
+               AI analyzes call
+                       ↓
+          Webhook sent to Juryo
+                       ↓
+        Contact created/found
+                       ↓
+   Opportunity created (if qualified)
+                       ↓
+    Communication logged with transcript
+```
+
+### Agent-to-Tenant Mapping
+
+Each Retell AI agent is mapped to a specific Juryo tenant:
+
+**Configuration in Juryo:**
+```
+Agent ID: agent_123abc
+→ Tenant: saldados-law-firm
+→ Legal Area: Immigration
+```
+
+**When call received:**
+1. Webhook includes agent ID
+2. Juryo looks up tenant mapping
+3. Contact/opportunity created in correct tenant
+4. Scoped properly for data isolation
+
+See [Agent Mapping](/integrations/voice/agent-mapping) for configuration.
+
+## Features
+
+### Automatic Call Handling
+
+Retell AI agents can:
+- **Answer calls** immediately (no wait time)
+- **Collect information**: Name, phone, reason for calling
+- **Answer FAQs**: Pre-programmed responses to common questions
+- **Qualify leads**: Determine if caller is good fit
+- **Schedule appointments**: Integration with calendar (if configured)
+- **Transfer calls**: Route to human if needed
+
+### Conversation Intelligence
+
+Every call is analyzed for:
+
+**Qualification Criteria:**
+- Did conversation succeed?
+- First filter passed (basic qualification)?
+- Fully qualified lead?
+- Appointment status (booked, declined, pending)
+
+**Extracted Information:**
+- Caller name and phone
+- Legal area of interest
+- Urgency level
+- Budget indication (if discussed)
+- Follow-up requirements
+
+**Sentiment Analysis:**
+- Caller emotion (positive, neutral, negative)
+- Confidence level in proceeding
+- Objection handling success
+
+### Automatic Opportunity Creation
+
+If call is qualified, Juryo automatically creates:
+
+1. **Contact** (if doesn't exist)
+   - Name from conversation
+   - Phone number
+   - Source: "retell_call"
+
+2. **Opportunity**
+   - Title: Based on legal need
+   - Stage: "Contacted" (already spoke)
+   - Service Type: From conversation analysis
+   - Priority: Based on urgency
+
+3. **Communication Record**
+   - Type: "retell_call"
+   - Full transcript
+   - Analysis results
+   - Call duration
+   - Success indicators
+
+### Call Transcripts
+
+Complete transcripts stored for every call:
+
+**Transcript Format:**
+```
+[00:00:03] Agent: Hello, thank you for calling. How can I help you today?
+[00:00:08] Caller: Hi, I need help with a work visa application.
+[00:00:12] Agent: I'd be happy to help with that. Can I get your name?
+[00:00:15] Caller: Sure, it's Maria Rodriguez.
+[00:00:18] Agent: Thank you Maria. And your phone number?
+[00:00:22] Caller: It's 555-123-4567.
+...
+```
+
+**Access Transcripts:**
+- Call Log page in Juryo
+- Individual call detail view
+- Communication tab on contact/opportunity
+- Via API: GET /api/retell-calls/:id
+
+### Integration with Zapier
+
+For failed or unqualified calls, send to Zapier:
+
+**Trigger:** Call ends with status "not qualified" or "no answer"
+
+**Zapier Action Options:**
+- Send notification to Slack
+- Create task in project management tool
+- Add to CRM for manual follow-up
+- Send email alert to team
+
+**Webhook Payload:**
+```json
+{
+  "callId": "call_abc123",
+  "status": "not_qualified",
+  "phone": "+15551234567",
+  "reason": "Budget too low",
+  "transcript": "...",
+  "duration": 120
+}
+```
+
+## Voice Agent API
+
+Special endpoints for Retell AI agents to query during live calls:
+
+### GET /api/voice/cases
+
+Agent can ask: "What cases does this client have?"
+
+**Response:** List of cases for the phone number calling
+
+**Use Case:** Agent can provide case status updates during call
+
+### POST /api/voice/clients
+
+Create contact from voice interaction:
+
+**Request:**
+```json
+{
+  "phone": "+15551234567",
+  "firstName": "Maria",
+  "lastName": "Rodriguez",
+  "agentId": "agent_123abc"
+}
+```
+
+**Use Case:** Agent creates contact mid-call for follow-up
+
+### POST /api/voice/client-with-case
+
+Create both contact and case in one call:
+
+**Use Case:** Qualified caller wants to proceed immediately. Agent creates contact, opportunity, and initiates case.
+
+See [Voice Agent API](/api-reference/voice/overview) for complete documentation.
+
+## Analytics
+
+### Call Metrics
+
+- **Total Calls**: Volume over time
+- **Answer Rate**: Percentage of calls answered by agent
+- **Average Duration**: Typical call length
+- **Qualification Rate**: Percentage of calls resulting in opportunities
+
+### Success Tracking
+
+- **Connection Success**: Did call connect properly?
+- **First Filter Success**: Basic qualification passed?
+- **Full Qualification**: Ready for consultation?
+- **Appointment Booked**: Meeting scheduled?
+
+### Performance by Agent
+
+If using multiple agents:
+- Calls handled per agent
+- Qualification rate by agent
+- Average call duration
+- Success rate comparison
+
+Access analytics via:
+- Call Log → Analytics tab
+- Dashboard widget
+- [Call Analytics API](/api-reference/analytics/call-analytics)
+
+## Setup Requirements
+
+<Steps>
+  <Step title="Retell AI Account">
+    Sign up at [retellai.com](https://www.retellai.com/) and create agents
+  </Step>
+  <Step title="Configure Webhook">
+    Set webhook URL to `https://your-tenant.juryo.ai/api/webhook/retell`
+  </Step>
+  <Step title="Map Agents to Tenants">
+    In Juryo admin, map each agent ID to your tenant
+  </Step>
+  <Step title="Set API Key">
+    Add `RETELL_API_KEY` to environment variables
+  </Step>
+  <Step title="Test">
+    Make test call and verify in Juryo Call Log
+  </Step>
+</Steps>
+
+See [Retell Setup Guide](/integrations/voice/retell-setup) for detailed instructions.
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Train agents for your practice area">
+    **Why:** Generic agents won't understand legal terminology or processes.
+
+    **How:** Customize agent prompts with your firm's specific services, FAQs, and qualification criteria.
+  </Accordion>
+
+  <Accordion title="Set clear qualification criteria">
+    **Why:** Not every caller is a good fit. Agent should qualify effectively.
+
+    **Criteria to configure:**
+    - Budget range
+    - Timeline urgency
+    - Legal need fit
+    - Geographic location (if relevant)
+  </Accordion>
+
+  <Accordion title="Review call transcripts regularly">
+    **Why:** Identify areas for agent improvement and training opportunities.
+
+    **How:** Weekly review of 10-20 random calls. Note patterns, objections, confusion points.
+  </Accordion>
+
+  <Accordion title="Set up fallback to human">
+    **Why:** Complex situations require human touch.
+
+    **When:** Agent confused, caller frustrated, high-value opportunity, technical legal questions.
+  </Accordion>
+</AccordionGroup>
+
+## Related Documentation
+
+<CardGroup cols={2}>
+  <Card
+    title="Retell AI Setup"
+    icon="gear"
+    href="/integrations/voice/retell-setup"
+  >
+    Configure Retell AI integration
+  </Card>
+  <Card
+    title="Agent-to-Tenant Mapping"
+    icon="sitemap"
+    href="/integrations/voice/agent-mapping"
+  >
+    Map agents to tenants and legal areas
+  </Card>
+  <Card
+    title="Voice Agent API"
+    icon="code"
+    href="/api-reference/voice/overview"
+  >
+    API endpoints for voice agents
+  </Card>
+  <Card
+    title="Call Analytics"
+    icon="chart-line"
+    href="/api-reference/analytics/call-analytics"
+  >
+    Retrieve call metrics via API
+  </Card>
+</CardGroup>

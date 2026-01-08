@@ -1,68 +1,194 @@
 {
   "$schema": "https://mintlify.com/docs.json",
   "theme": "mint",
-  "name": "Mint Starter Kit",
+  "name": "Juryo Legal SaaS",
   "colors": {
-    "primary": "#16A34A",
-    "light": "#07C983",
-    "dark": "#15803D"
+    "primary": "#2563EB",
+    "light": "#3B82F6",
+    "dark": "#1E40AF"
   },
   "favicon": "/favicon.svg",
   "navigation": {
     "tabs": [
       {
-        "tab": "Guides",
+        "tab": "Platform Guide",
         "groups": [
           {
-            "group": "Getting started",
+            "group": "Getting Started",
             "pages": [
               "index",
               "quickstart",
-              "development"
+              "platform-overview",
+              "multi-tenant-architecture"
             ]
           },
           {
-            "group": "Customization",
+            "group": "Core Features",
             "pages": [
-              "essentials/settings",
-              "essentials/navigation"
+              "features/contact-management",
+              "features/opportunity-pipeline",
+              "features/case-management",
+              "features/document-management",
+              "features/communications"
             ]
           },
           {
-            "group": "Writing content",
+            "group": "User Guides",
             "pages": [
-              "essentials/markdown",
-              "essentials/code",
-              "essentials/images",
-              "essentials/reusable-snippets"
-            ]
-          },
-          {
-            "group": "AI tools",
-            "pages": [
-              "ai-tools/cursor",
-              "ai-tools/claude-code",
-              "ai-tools/windsurf"
+              "guides/admin-guide",
+              "guides/lawyer-guide",
+              "guides/client-portal"
             ]
           }
         ]
       },
       {
-        "tab": "API reference",
+        "tab": "Integrations",
         "groups": [
           {
-            "group": "API documentation",
+            "group": "Communication Channels",
             "pages": [
-              "api-reference/introduction"
+              "integrations/whatsapp/overview",
+              "integrations/whatsapp/setup",
+              "integrations/whatsapp/webhook",
+              "integrations/voice/overview",
+              "integrations/voice/retell-setup",
+              "integrations/voice/agent-mapping"
             ]
           },
           {
-            "group": "Endpoint examples",
+            "group": "Automation & Workflows",
             "pages": [
-              "api-reference/endpoint/get",
-              "api-reference/endpoint/create",
-              "api-reference/endpoint/delete",
-              "api-reference/endpoint/webhook"
+              "integrations/automation/automation-rules",
+              "integrations/automation/task-flows",
+              "integrations/automation/flow-templates"
+            ]
+          },
+          {
+            "group": "Webhooks & External Systems",
+            "pages": [
+              "integrations/webhooks/overview",
+              "integrations/webhooks/configuration",
+              "integrations/webhooks/security",
+              "integrations/webhooks/troubleshooting"
+            ]
+          },
+          {
+            "group": "Storage & AI",
+            "pages": [
+              "integrations/google-cloud-storage",
+              "integrations/ai-document-review"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "API Overview",
+            "pages": [
+              "api-reference/introduction",
+              "api-reference/authentication",
+              "api-reference/multi-tenant-headers",
+              "api-reference/error-handling"
+            ]
+          },
+          {
+            "group": "Contacts & Opportunities",
+            "pages": [
+              "api-reference/contacts/list-contacts",
+              "api-reference/contacts/create-contact",
+              "api-reference/contacts/get-contact",
+              "api-reference/contacts/update-contact",
+              "api-reference/opportunities/list-opportunities",
+              "api-reference/opportunities/create-opportunity",
+              "api-reference/opportunities/update-stage"
+            ]
+          },
+          {
+            "group": "Cases & Documents",
+            "pages": [
+              "api-reference/cases/list-cases",
+              "api-reference/cases/create-case",
+              "api-reference/cases/get-case",
+              "api-reference/documents/upload-document",
+              "api-reference/documents/ai-review"
+            ]
+          },
+          {
+            "group": "Communications",
+            "pages": [
+              "api-reference/communications/whatsapp-send",
+              "api-reference/communications/conversations",
+              "api-reference/communications/call-log"
+            ]
+          },
+          {
+            "group": "Voice Agent API",
+            "pages": [
+              "api-reference/voice/overview",
+              "api-reference/voice/list-cases",
+              "api-reference/voice/create-client",
+              "api-reference/voice/create-opportunity-by-phone"
+            ]
+          },
+          {
+            "group": "Webhook Endpoints",
+            "pages": [
+              "api-reference/webhooks/incoming/retell",
+              "api-reference/webhooks/incoming/whatsapp",
+              "api-reference/webhooks/incoming/contact-opportunity",
+              "api-reference/webhooks/outgoing/query-contacts",
+              "api-reference/webhooks/outgoing/query-opportunities"
+            ]
+          },
+          {
+            "group": "Analytics",
+            "pages": [
+              "api-reference/analytics/opportunity-analytics",
+              "api-reference/analytics/call-analytics",
+              "api-reference/analytics/whatsapp-analytics"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Developer Guide",
+        "groups": [
+          {
+            "group": "Development Setup",
+            "pages": [
+              "developers/local-setup",
+              "developers/environment-variables",
+              "developers/database-setup",
+              "developers/development-workflow"
+            ]
+          },
+          {
+            "group": "Architecture",
+            "pages": [
+              "developers/architecture/tech-stack",
+              "developers/architecture/database-schema",
+              "developers/architecture/multi-tenancy",
+              "developers/architecture/authentication"
+            ]
+          },
+          {
+            "group": "Best Practices",
+            "pages": [
+              "developers/best-practices/tenant-scoping",
+              "developers/best-practices/error-handling",
+              "developers/best-practices/security",
+              "developers/best-practices/testing"
+            ]
+          },
+          {
+            "group": "Analytics & Reporting",
+            "pages": [
+              "analytics/opportunity-analytics",
+              "analytics/communication-metrics",
+              "analytics/payment-tracking"
             ]
           }
         ]
@@ -71,14 +197,14 @@
     "global": {
       "anchors": [
         {
-          "anchor": "Documentation",
-          "href": "https://mintlify.com/docs",
-          "icon": "book-open-cover"
+          "anchor": "Support",
+          "href": "mailto:nino.caminhante@antaiventures.com",
+          "icon": "headset"
         },
         {
-          "anchor": "Blog",
-          "href": "https://mintlify.com/blog",
-          "icon": "newspaper"
+          "anchor": "GitHub",
+          "href": "https://github.com/juryo/juryo-platform",
+          "icon": "github"
         }
       ]
     }
@@ -91,13 +217,13 @@
     "links": [
       {
         "label": "Support",
-        "href": "mailto:hi@mintlify.com"
+        "href": "mailto:nino.caminhante@antaiventures.com"
       }
     ],
     "primary": {
       "type": "button",
-      "label": "Dashboard",
-      "href": "https://dashboard.mintlify.com"
+      "label": "Sign In",
+      "href": "https://app.juryo.ai"
     }
   },
   "contextual": {
@@ -114,9 +240,8 @@
   },
   "footer": {
     "socials": {
-      "x": "https://x.com/mintlify",
-      "github": "https://github.com/mintlify",
-      "linkedin": "https://linkedin.com/company/mintlify"
+      "github": "https://github.com/juryo/juryo-platform",
+      "linkedin": "https://linkedin.com/company/juryo"
     }
   }
 }

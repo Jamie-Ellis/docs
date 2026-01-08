@@ -1,0 +1,671 @@
+---
+title: "Case Management"
+description: "Comprehensive case lifecycle management from consultation to closure"
+---
+
+## Overview
+
+Juryo's case management system helps law firms organize and track legal matters from initial consultation through case closure. Cases represent active legal work, with document tracking, attorney assignment, status workflows, and complete activity history.
+
+<Info>
+**Key Capabilities**
+- Customizable case status workflows
+- Document management with AI review
+- Attorney assignment and collaboration
+- Requirement tracking per legal process
+- Complete audit trail of all activities
+- Payment plan integration
+</Info>
+
+## Case Lifecycle
+
+Cases progress through customizable statuses as legal work advances.
+
+### Standard Status Flow
+
+| Status | Description | Typical Duration |
+|--------|-------------|------------------|
+| **Consultation** | Initial case review and assessment | 1-7 days |
+| **Active** | Work in progress | Varies by case type |
+| **Waiting on Client** | Awaiting client documents or payment | Variable |
+| **Waiting on Third Party** | Pending external responses (USCIS, courts, etc.) | Variable |
+| **Under Review** | Internal review before submission | 3-7 days |
+| **Submitted** | Filed with agency or court | Variable |
+| **Completed** | Case successfully closed | N/A |
+| **Cancelled** | Case terminated before completion | N/A |
+
+<Note>
+Case statuses are customizable per tenant. Admins can configure workflows specific to their practice areas.
+</Note>
+
+### Status Transitions
+
+```
+Consultation → Active → Under Review → Submitted → Completed
+       ↓          ↓            ↓
+   Cancelled   Waiting      Waiting
+              on Client   on Third Party
+                 ↓              ↓
+               Active ← ────────┘
+```
+
+## Creating Cases
+
+### From Won Opportunity
+
+The most common way to create a case is by converting a won opportunity:
+
+1. Open the opportunity (must be in "Won" stage)
+2. Click **Convert to Case**
+3. System pre-fills information:
+   - **Client**: Opportunity's contact (automatically updated to "Client" role)
+   - **Legal Area**: From opportunity service type
+   - **Legal Process**: From opportunity details
+   - **Case Value**: From opportunity estimated value
+4. Add case-specific details:
+   - Case name/number (auto-generated or custom)
+   - Assigned attorney
+   - Initial status (typically "Consultation")
+   - Expected completion date
+   - Case notes
+5. Click **Create Case**
+
+**Automatic Actions:**
+- Contact role updated to "Client"
+- Opportunity linked to case
+- Communication history transferred
+- Document requirements populated (based on legal process)
+- Initial tasks created (if workflow configured)
+
+### Manual Case Creation
+
+Create a case directly without an opportunity:
+
+1. Navigate to **Cases** page
+2. Click **New Case**
+3. Select or create client contact
+4. Fill in case details:
+   - **Case Name**: Descriptive title
+   - **Legal Area**: Practice area (Immigration, Corporate, Family, etc.)
+   - **Legal Process**: Specific procedure (H-1B Visa, LLC Formation, etc.)
+   - **Assigned Attorney**: Primary team member
+   - **Status**: Initial status
+   - **Priority**: High, Medium, Low
+   - **Fee Structure**: Flat fee, hourly, contingency
+   - **Case Value**: Expected revenue
+5. Click **Create Case**
+
+### API Case Creation
+
+```javascript
+const response = await fetch('/api/cases', {
+  method: 'POST',
+  credentials: 'include',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    clientId: "contact-uuid",
+    caseName: "H-1B Visa - Software Engineer",
+    legalAreaId: "immigration-uuid",
+    legalProcessId: "h1b-visa-uuid",
+    assignedAttorneyId: "attorney-uuid",
+    status: "consultation",
+    priority: "high",
+    estimatedValue: 8000,
+    notes: "Initial consultation scheduled for Jan 15"
+  })
+});
+
+const { data } = await response.json();
+console.log('Case created:', data.id);
+```
+
+See [Create Case API](/api-reference/cases/create-case) for full documentation.
+
+## Case Details View
+
+### Overview Tab
+
+**Core Information:**
+- Case name and number
+- Client (clickable link to contact)
+- Legal area and process
+- Current status and last updated
+- Assigned attorney and team
+- Priority level
+- Important dates (opened, expected completion, actual completion)
+
+**Financial Information:**
+- Fee structure (flat, hourly, contingency)
+- Case value
+- Payment plan status (if applicable)
+- Amount paid to date
+- Outstanding balance
+
+**Quick Actions:**
+- Update status
+- Upload document
+- Add team member
+- Create task
+- Add note
+- Generate invoice
+
+### Documents Tab
+
+All documents related to this case:
+
+**Document Organization:**
+- Grouped by document type (passport, birth certificate, contract, etc.)
+- Linked to specific requirements (if applicable)
+- Version history for updated documents
+- AI review status indicator
+
+**Document Details:**
+- File name and type
+- Upload date and user
+- File size
+- Requirement linked (if any)
+- AI review result (approved/rejected/pending)
+- Download link (signed URL)
+
+**Actions:**
+- Upload new document
+- Request AI review
+- Link to requirement
+- Download
+- Delete (with confirmation)
+
+See [Document Management](/features/document-management) for details.
+
+### Requirements Tab
+
+Track document and information requirements for this case:
+
+**Requirement Types:**
+- **Document**: Specific file needed (passport, diploma, etc.)
+- **Information**: Data to collect (employment history, travel dates, etc.)
+- **Action**: Task to complete (medical exam, fingerprinting, etc.)
+
+**Requirement Status:**
+- ⚪ Not Started
+- 🟡 In Progress
+- 🟢 Completed
+- 🔴 Missing/Overdue
+
+**Example Requirements for H-1B Visa:**
+```
+✅ Valid Passport (Document) - Completed
+✅ Bachelor's Degree Diploma (Document) - Completed, AI Reviewed
+🟡 Employment Offer Letter (Document) - Uploaded, pending review
+🟡 Last 3 Pay Stubs (Document) - 2 of 3 received
+⚪ LCA Filing (Action) - Not started
+⚪ Form I-129 Preparation (Action) - Not started
+```
+
+**Automatic Requirement Generation:**
+When a case is created with a specific legal process, Juryo automatically populates requirements from the process template.
+
+### Activities Tab
+
+Complete audit trail of all case actions:
+
+**Activity Types:**
+- Status changes
+- Document uploads
+- Task completions
+- Team member additions/removals
+- Communication events
+- Field updates
+- Payment received
+- Notes added
+
+**Activity Example:**
+```
+Jan 8, 2025  10:30 AM  Case created by Sarah Johnson
+Jan 8, 2025  11:00 AM  Document uploaded: passport.pdf
+Jan 8, 2025  11:05 AM  AI review completed: APPROVED (95% confidence)
+Jan 9, 2025  2:15 PM   Status changed: Consultation → Active
+Jan 9, 2025  2:20 PM   Task assigned: Prepare Form I-129 to John Smith
+Jan 10, 2025 9:00 AM   Payment received: $4,000 (50% deposit)
+```
+
+**Filter Options:**
+- By activity type
+- By date range
+- By team member
+- By activity category
+
+### Communications Tab
+
+All interactions related to this case:
+
+**Communication History:**
+- WhatsApp conversations
+- Voice calls with transcripts
+- Email correspondence
+- SMS messages
+- In-person meetings
+- System notes
+
+**Linked Communications:**
+Communications can be linked to specific cases from the contact's history, allowing team members to see all relevant conversations in context.
+
+**Actions:**
+- Send WhatsApp message (if connected)
+- Log phone call
+- Add meeting notes
+- Email client
+
+### Team Tab
+
+Manage case team members:
+
+**Team Roles:**
+- **Primary Attorney**: Main case handler (required)
+- **Supporting Attorney**: Additional lawyers assisting
+- **Paralegal**: Administrative support
+- **Associate**: Junior team members
+- **External Counsel**: Outside attorneys (for co-counsel situations)
+
+**Team Member Details:**
+- Name and role
+- Assignment date
+- Hours logged (if time tracking enabled)
+- Task assignments
+- Communication ownership
+
+**Collaboration:**
+- Internal notes visible only to team
+- Task assignment within team
+- Document sharing
+- Case discussion threads
+
+### Tasks Tab
+
+Case-specific tasks and to-dos:
+
+**Task Information:**
+- Task description
+- Assigned team member
+- Due date and priority
+- Status (pending, in progress, completed)
+- Notes and attachments
+
+**Task Types:**
+- Document collection reminders
+- Filing deadlines
+- Client follow-ups
+- Internal reviews
+- Court appearances
+- Agency submissions
+
+**Automatic Task Creation:**
+Tasks can be auto-generated from:
+- Legal process templates
+- Status change triggers
+- Automation rules
+- Workflow templates
+
+## Attorney Assignment
+
+### Primary Attorney
+
+Every case must have a primary attorney:
+
+**Responsibilities:**
+- Overall case ownership
+- Client communication
+- Final review and approval
+- Strategic decisions
+
+**Assignment Methods:**
+- Manual selection during case creation
+- Automatic assignment based on workload
+- Round-robin distribution
+- Expertise-based routing
+- Converted from opportunity owner
+
+### Team Collaboration
+
+Add supporting team members:
+
+1. Open case
+2. Navigate to **Team** tab
+3. Click **Add Team Member**
+4. Select user and role
+5. Optionally set:
+   - Hourly rate (if billing by time)
+   - Access permissions
+   - Notification preferences
+6. Click **Add**
+
+**Team Notifications:**
+- New documents uploaded
+- Status changes
+- Task assignments
+- Client communications
+- Approaching deadlines
+
+## Document Requirements
+
+### Requirement Templates
+
+Legal processes have predefined document requirements:
+
+**Example: H-1B Visa Requirements**
+```json
+{
+  "legalProcess": "H-1B Visa",
+  "requirements": [
+    {
+      "name": "Valid Passport",
+      "type": "specific_document",
+      "required": true,
+      "aiReviewable": true,
+      "description": "Passport must be valid for at least 6 months beyond intended stay"
+    },
+    {
+      "name": "Bachelor's Degree Diploma",
+      "type": "specific_document",
+      "required": true,
+      "aiReviewable": true
+    },
+    {
+      "name": "Employment Offer Letter",
+      "type": "specific_document",
+      "required": true,
+      "aiReviewable": false
+    },
+    {
+      "name": "Resume/CV",
+      "type": "general_document",
+      "required": true
+    }
+  ]
+}
+```
+
+### AI Document Review
+
+For requirements marked as `aiReviewable: true`, Juryo can automatically validate documents:
+
+**Review Process:**
+1. Document uploaded and linked to requirement
+2. Click **Request AI Review**
+3. Google Gemini AI analyzes document
+4. System returns:
+   - **Status**: Approved or Rejected
+   - **Confidence**: 0-100% score
+   - **Feedback**: Specific issues or confirmation
+5. Requirement status updated automatically
+
+**Example AI Review:**
+```json
+{
+  "documentId": "doc-uuid",
+  "requirementId": "req-uuid",
+  "status": "approved",
+  "confidence": 92,
+  "feedback": "Passport is valid and meets all requirements. Expiration date: 2028-05-15. Valid for 6+ months beyond intended stay.",
+  "reviewedAt": "2025-01-08T15:30:00Z"
+}
+```
+
+<Warning>
+**AI Review Limitations**
+
+AI document review is a tool to assist attorneys, not replace human review. Always verify AI decisions, especially for critical documents.
+</Warning>
+
+See [AI Document Review](/integrations/ai-document-review) for setup and capabilities.
+
+## Case Status Management
+
+### Updating Status
+
+**Manual Update:**
+1. Open case
+2. Click status dropdown
+3. Select new status
+4. Optionally add note explaining change
+5. Click **Update**
+
+**Automatic Update:**
+Status changes can trigger automatically based on:
+- Task completions
+- Document uploads
+- Payment received
+- External webhook events
+- Time-based rules
+
+**Example Automation:**
+```
+Trigger: All required documents marked "Completed"
+AND Payment plan status is "Paid"
+Action: Update case status to "Under Review"
+```
+
+### Status Change Notifications
+
+When case status changes, notifications can be sent to:
+- Assigned attorney
+- Full case team
+- Client (via email or WhatsApp)
+- External systems (via webhook)
+
+**Notification Configuration:**
+Configure per status which parties should be notified and through which channels.
+
+## Case Analytics
+
+### Individual Case Metrics
+
+**Time Tracking:**
+- Days since case opened
+- Days in current status
+- Expected completion vs. actual
+- Time to reach milestones
+
+**Document Metrics:**
+- Total documents uploaded
+- Requirements completed (percentage)
+- Pending document reviews
+- AI review approval rate
+
+**Financial Metrics:**
+- Total case value
+- Amount paid to date
+- Outstanding balance
+- Payment plan adherence
+
+### Aggregate Case Analytics
+
+**By Status:**
+- Cases in each status (count)
+- Average time in each status
+- Bottleneck identification
+- Status distribution over time
+
+**By Legal Area:**
+- Cases per practice area
+- Average case value by area
+- Completion rates
+- Revenue by area
+
+**By Attorney:**
+- Active case load
+- Average case duration
+- Completion rate
+- Client satisfaction scores (if tracked)
+
+**Completion Trends:**
+- Cases completed per month
+- Average time to completion
+- Success rate by case type
+- Revenue realized
+
+## Payment Plans
+
+### Creating Payment Plans
+
+Link payment plans to cases for installment billing:
+
+1. Open case
+2. Navigate to **Payments** section
+3. Click **Create Payment Plan**
+4. Configure:
+   - Total amount
+   - Number of installments
+   - Due dates
+   - Payment method
+5. Click **Create**
+
+**Payment Statuses:**
+- **Pending**: Not yet paid
+- **Partially Paid**: Some installments paid
+- **Paid**: Fully paid
+- **Overdue**: Past due date
+- **Cancelled**: Payment plan cancelled
+
+**Automation Integration:**
+Payment status changes can trigger case actions:
+- Payment received → Move case to next status
+- Payment overdue → Create follow-up task
+- Payment complete → Notify team
+
+See [Payment Tracking](/analytics/payment-tracking) for details.
+
+## Case Templates
+
+### Creating Templates
+
+For frequently handled case types, create templates:
+
+**Template Components:**
+- Standard case name format
+- Default status workflow
+- Pre-defined requirements
+- Automatic task list
+- Standard fee structure
+- Document checklist
+
+**Example Template: H-1B Visa**
+```
+Case Name: "H-1B Visa - [Client Name] - [Position]"
+Initial Status: Consultation
+Requirements: [15 standard requirements]
+Tasks:
+  - Initial consultation (due: Day 1)
+  - Collect client documents (due: Day 7)
+  - Prepare LCA (due: Day 14)
+  - File Form I-129 (due: Day 30)
+Fee: $8,000 flat fee
+```
+
+**Using Templates:**
+When creating a case, select template to auto-populate all settings.
+
+## Case Closure
+
+### Completing Cases
+
+When legal work is finished:
+
+1. Update status to "Completed"
+2. Confirm all requirements met
+3. Ensure all documents finalized
+4. Verify payment received
+5. Add completion notes
+6. Optionally generate completion report
+
+**Automatic Actions on Completion:**
+- Client role optionally updated to "Former Client"
+- Final invoice generated (if applicable)
+- Completion notification sent
+- Case archived after retention period
+
+### Cancelling Cases
+
+If case cannot proceed:
+
+1. Update status to "Cancelled"
+2. Select cancellation reason:
+   - Client withdrew
+   - Payment issues
+   - Conflict of interest
+   - Transferred to another firm
+   - Ineligible for service
+3. Add cancellation notes
+4. Process refund (if applicable)
+
+**Cancelled Case Handling:**
+- Remains in system for records
+- Communication history preserved
+- Documents retained per policy
+- Not included in active case metrics
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Update case status regularly">
+    **Why:** Accurate status tracking enables better resource planning and client communication.
+
+    **How:** Review cases weekly. Update status as work progresses. Use automation to trigger status changes based on milestones.
+  </Accordion>
+
+  <Accordion title="Link all communications to cases">
+    **Why:** Complete case history is essential for continuity and quality service.
+
+    **How:** Use WhatsApp/voice integrations for automatic linking. Manually link emails and calls to relevant cases.
+  </Accordion>
+
+  <Accordion title="Track requirements proactively">
+    **Why:** Missing documents cause delays. Proactive tracking keeps cases moving forward.
+
+    **How:** Review requirements tab weekly. Send reminders for pending documents. Use automation for follow-ups.
+  </Accordion>
+
+  <Accordion title="Assign cases appropriately">
+    **Why:** Proper workload distribution prevents burnout and maintains quality.
+
+    **How:** Monitor case load per attorney. Consider complexity and urgency when assigning. Balance across team.
+  </Accordion>
+
+  <Accordion title="Use AI review as a first pass">
+    **Why:** AI review catches obvious issues quickly, allowing attorneys to focus on complex analysis.
+
+    **How:** Request AI review immediately after document upload. Have attorney verify AI decisions. Document any overrides.
+  </Accordion>
+</AccordionGroup>
+
+## Related Features
+
+<CardGroup cols={2}>
+  <Card
+    title="Document Management"
+    icon="file"
+    href="/features/document-management"
+  >
+    Document upload, AI review, and requirement tracking
+  </Card>
+  <Card
+    title="Opportunity Pipeline"
+    icon="chart-line"
+    href="/features/opportunity-pipeline"
+  >
+    Convert won opportunities to cases
+  </Card>
+  <Card
+    title="Case API Reference"
+    icon="code"
+    href="/api-reference/cases/list-cases"
+  >
+    Complete API documentation for case operations
+  </Card>
+  <Card
+    title="Automation Rules"
+    icon="wand-magic-sparkles"
+    href="/integrations/automation/automation-rules"
+  >
+    Automate case workflows and status changes
+  </Card>
+</CardGroup>

@@ -1,0 +1,502 @@
+---
+title: "Multi-Tenant Architecture"
+description: "Understanding Juryo's secure multi-tenant data isolation and domain-based routing"
+---
+
+## What is Multi-Tenancy?
+
+Juryo is a **multi-tenant SaaS platform**, meaning a single instance of the application serves multiple law firms (tenants) with complete data isolation. Each law firm has its own isolated workspace, custom domain, and cannot access data from other firms.
+
+<Info>
+**Key Principle**: Every tenant's data is completely isolated - no cross-tenant data access is possible by design.
+</Info>
+
+## Why Multi-Tenancy Matters
+
+### For Law Firms
+
+- **Data Privacy** - Your client data is completely isolated from other firms
+- **Custom Branding** - Each firm has its own subdomain (e.g., `yourlawfirm.juryo.ai`)
+- **Independent Configuration** - Customize legal areas, processes, and workflows
+- **Compliance** - Meet data residency and privacy requirements
+
+### For the Platform
+
+- **Cost Efficiency** - Single infrastructure serves all customers
+- **Easy Updates** - Deploy features to all tenants simultaneously
+- **Centralized Maintenance** - Monitor and manage from one system
+- **Scalability** - Add new tenants without infrastructure changes
+
+## How Tenant Isolation Works
+
+### 1. Database-Level Isolation
+
+Every database table includes a `tenantId` column that links records to a specific law firm.
+
+#### Schema Pattern
+
+```sql
+CREATE TABLE contacts (
+  id VARCHAR PRIMARY KEY,
+  tenant_id VARCHAR NOT NULL,  -- Foreign key to tenants table
+  first_name VARCHAR,
+  last_name VARCHAR,
+  email VARCHAR,
+  phone VARCHAR,
+  -- ... other fields
+  FOREIGN KEY (tenant_id) REFERENCES tenants(id)
+);
+```
+
+#### Query Pattern
+
+All database queries **must** include tenant filtering:
+
+```typescript
+// ✅ CORRECT - Always filter by tenantId
+const contacts = await db.select()
+  .from(contacts)
+  .where(eq(contacts.tenantId, currentTenantId));
+
+// ❌ WRONG - Missing tenant filter, security vulnerability!
+const contacts = await db.select()
+  .from(contacts);
+```
+
+<Warning>
+**Critical Security Rule**
+
+Every database query on tenant-scoped tables MUST include `WHERE tenant_id = ?` to prevent data leakage. Missing this filter is a security vulnerability.
+</Warning>
+
+#### Tables with Tenant Scoping
+
+Most tables in Juryo are tenant-scoped:
+
+| Table | Purpose |
+|-------|---------|
+| `contacts` | Client and lead records |
+| `opportunities` | Sales pipeline |
+| `cases` | Legal matters |
+| `communications` | All interactions |
+| `documents` | Case files metadata |
+| `webhook_configurations` | Integration settings |
+| `automation_rules` | Workflow automation |
+| `tasks` | Scheduled actions |
+| `payment_plans` | Financial tracking |
+
+#### Global Tables (No Tenant Scoping)
+
+Some tables are intentionally global:
+
+| Table | Purpose | Why Global? |
+|-------|---------|-------------|
+| `tenants` | Law firm accounts | Central tenant registry |
+| `users` | User accounts | Users can belong to multiple tenants |
+| `tenant_users` | User-tenant mapping | Links users to their tenants |
+| `retell_calls` | Voice call records | Mapped to tenants via agent mapping |
+
+### 2. Domain-Based Routing
+
+Each law firm accesses Juryo through a custom subdomain.
+
+#### Domain Examples
+
+- `saldados.juryo.ai` - Saldados Law Firm
+- `immigration-experts.juryo.ai` - Immigration Experts
+- `corporate-legal.juryo.ai` - Corporate Legal Group
+
+#### How It Works
+
+1. **User visits tenant-specific URL** - e.g., `https://saldados.juryo.ai`
+2. **System looks up domain mapping** - Queries `tenant_domains` table
+3. **Resolves to tenantId** - Finds associated tenant UUID
+4. **All subsequent operations scoped** - API calls automatically filtered by tenant
+
+#### Domain Configuration
+
+Domains are configured in the `tenant_domains` table:
+
+```typescript
+{
+  id: "uuid-here",
+  tenantId: "tenant-uuid",
+  domain: "saldados.juryo.ai",
+  isActive: true,
+  createdAt: "2025-01-08T00:00:00Z"
+}
+```
+
+**Multiple domains per tenant** are supported for:
+- Custom branded domains
+- Testing/staging environments
+- Regional variations
+
+### 3. File Storage Isolation
+
+Documents uploaded to Google Cloud Storage are isolated using tenant-prefixed paths.
+
+#### Storage Structure
+
+```
+bucket-name/
+├── tenants/
+│   ├── {tenant-uuid-hash}/
+│   │   ├── documents/
+│   │   │   ├── {file-hash}.pdf
+│   │   │   ├── {file-hash}.jpg
+│   │   │   └── ...
+│   │   └── ...
+│   ├── {another-tenant-uuid-hash}/
+│   │   └── ...
+```
+
+#### Security Measures
+
+- **Hashed tenant IDs** - Tenant UUIDs are SHA-256 hashed for obfuscation
+- **Signed URLs** - Temporary access tokens with expiration
+- **No cross-tenant access** - Storage permissions enforce tenant boundaries
+- **7-year retention** - Complies with legal document retention requirements
+
+#### File Upload Flow
+
+1. User uploads document via API
+2. System hashes file content (SHA-256)
+3. Uploads to `tenants/{hashed-tenant-id}/documents/{file-hash}.ext`
+4. Stores metadata in `documents` table with `tenantId`
+5. Returns signed URL for temporary access
+
+### 4. Authentication & Authorization
+
+#### User-Tenant Relationship
+
+Users are linked to tenants through the `tenant_users` table:
+
+```typescript
+{
+  userId: "user-uuid",
+  tenantId: "tenant-uuid",
+  role: "admin" | "lawyer" | "client",
+  isActive: true
+}
+```
+
+**Users can belong to multiple tenants** - Useful for:
+- Consultants working with multiple firms
+- Super admins managing the platform
+- Users with roles in affiliated firms
+
+#### Session Management
+
+When a user logs in:
+
+1. **Replit Auth authenticates** - Verifies user identity
+2. **System checks tenant membership** - Queries `tenant_users`
+3. **Establishes session** - Stores `userId` and current `tenantId`
+4. **All API calls scoped** - Middleware enforces tenant boundaries
+
+#### Role-Based Access Control
+
+Each user-tenant relationship has a role:
+
+| Role | Permissions | Use Case |
+|------|-------------|----------|
+| **Admin** | Full access to tenant configuration, users, and data | Law firm owner or manager |
+| **Lawyer** | Access to cases, clients, and communications | Attorney or paralegal |
+| **Client** | Limited access to own cases and communications | Client portal view |
+
+### 5. API Tenant Resolution
+
+API endpoints resolve the tenant using multiple strategies:
+
+#### Strategy 1: Domain-Based (Web Requests)
+
+```typescript
+// User accesses https://saldados.juryo.ai/api/contacts
+// System extracts subdomain: "saldados"
+// Looks up tenantId from tenant_domains
+// Filters contacts WHERE tenant_id = resolved-tenant-id
+```
+
+#### Strategy 2: Session-Based (Authenticated Users)
+
+```typescript
+// User logged in, session contains tenantId
+// API extracts tenantId from session
+// Filters all queries by session.tenantId
+```
+
+#### Strategy 3: Header-Based (Webhooks & Integrations)
+
+```typescript
+// External system sends: x-tenant-id: uuid-here
+// API validates header and uses provided tenantId
+// Used for webhooks, external integrations, testing
+```
+
+<Warning>
+**Header Override Security**
+
+The `x-tenant-id` header should only be trusted for:
+- Authenticated webhook endpoints with signature verification
+- Internal system-to-system calls
+- Testing/development environments
+
+Production user-facing endpoints should never trust this header directly.
+</Warning>
+
+## Tenant Middleware
+
+Juryo implements middleware to enforce tenant scoping automatically.
+
+### Request Flow
+
+```
+1. HTTP Request → Express Server
+2. Authentication Middleware → Verify user session
+3. Tenant Resolution Middleware → Determine tenantId
+4. Route Handler → Execute business logic
+5. Database Query → Automatically includes WHERE tenant_id = ?
+6. Response → Return tenant-scoped data
+```
+
+### Middleware Implementation Pattern
+
+```typescript
+async function tenantMiddleware(req, res, next) {
+  // Strategy 1: Try domain-based resolution
+  const domain = req.hostname;
+  let tenant = await db.query.tenantDomains.findFirst({
+    where: eq(tenantDomains.domain, domain)
+  });
+
+  if (!tenant && req.user) {
+    // Strategy 2: Fallback to user's tenant
+    tenant = await db.query.tenantUsers.findFirst({
+      where: eq(tenantUsers.userId, req.user.id)
+    });
+  }
+
+  if (!tenant && req.headers['x-tenant-id']) {
+    // Strategy 3: Webhook/integration header
+    tenant = await db.query.tenants.findFirst({
+      where: eq(tenants.id, req.headers['x-tenant-id'])
+    });
+  }
+
+  if (!tenant) {
+    return res.status(403).json({ error: 'No tenant access' });
+  }
+
+  // Attach to request for downstream use
+  req.tenantId = tenant.id;
+  next();
+}
+```
+
+## Multi-Tenant Configuration
+
+### Tenant-Specific Settings
+
+Each tenant can customize:
+
+**Legal Configuration:**
+- Legal areas (Immigration, Corporate, Family, etc.)
+- Legal processes (H-1B Visa, Green Card, LLC Formation, etc.)
+- Document requirements per process
+- Service types and categories
+
+**Workflow Configuration:**
+- Automation rules and triggers
+- Task templates
+- Flow templates
+- Webhook endpoints
+
+**Team Configuration:**
+- User roles and permissions
+- Attorney assignments
+- Department structure
+- Access controls
+
+### Creating a New Tenant
+
+1. **Create tenant record** in `tenants` table
+2. **Configure domain** in `tenant_domains` table
+3. **Add initial admin user** to `tenant_users`
+4. **Set up default legal areas** (optional)
+5. **Configure integrations** (WhatsApp, Retell AI, etc.)
+
+## Data Migration & Import
+
+### Importing Existing Clients
+
+When migrating from another system:
+
+1. **Map external IDs** - Store original system IDs in `externalID` field
+2. **Maintain uniqueness** - Unique constraint on `(tenantId, externalID)`
+3. **Preserve relationships** - Link contacts to opportunities and cases
+4. **Migrate communications** - Import historical interaction data
+
+### Avoiding Duplicate Records
+
+```typescript
+// Check if contact already exists by externalID
+const existingContact = await db.query.contacts.findFirst({
+  where: and(
+    eq(contacts.tenantId, tenantId),
+    eq(contacts.externalID, externalSystemId)
+  )
+});
+
+if (existingContact) {
+  // Update existing record
+  await db.update(contacts)
+    .set({ /* updated fields */ })
+    .where(eq(contacts.id, existingContact.id));
+} else {
+  // Create new record
+  await db.insert(contacts).values({
+    tenantId,
+    externalID: externalSystemId,
+    // ... other fields
+  });
+}
+```
+
+## Tenant Analytics & Monitoring
+
+### Per-Tenant Metrics
+
+Each tenant has independent analytics:
+- Opportunity conversion rates
+- Communication success rates
+- Case completion times
+- Revenue by legal area
+- Team performance metrics
+
+### Cross-Tenant Analytics (Admin Only)
+
+Platform administrators can view aggregated metrics:
+- Total active tenants
+- Average conversion rates across tenants
+- Popular legal service types
+- Platform usage patterns
+
+## Security Best Practices
+
+### For Developers
+
+<Warning>
+**Critical Security Checklist**
+
+✅ **Always** filter queries by `tenantId`
+✅ **Always** validate user has access to the tenant
+✅ **Never** trust `tenantId` from client-side requests
+✅ **Always** use parameterized queries (prevent SQL injection)
+✅ **Never** expose `tenantId` in public URLs or logs
+✅ **Always** validate webhook signatures before processing
+✅ **Test** cross-tenant access controls rigorously
+</Warning>
+
+### Code Review Guidelines
+
+When reviewing pull requests:
+
+1. **Check all new queries** - Ensure `WHERE tenant_id = ?`
+2. **Verify API endpoints** - Confirm tenant middleware applied
+3. **Test edge cases** - Try accessing other tenants' data
+4. **Review file operations** - Confirm tenant-prefixed paths
+5. **Validate webhooks** - Ensure signature verification
+
+### Testing Multi-Tenancy
+
+```typescript
+// Test: User from Tenant A cannot access Tenant B's data
+test('tenant isolation', async () => {
+  const tenantA_contact = await createContact(tenantA_id, {...});
+  const tenantB_user = await loginAs(tenantB_user);
+
+  const result = await tenantB_user.fetch(`/api/contacts/${tenantA_contact.id}`);
+
+  expect(result.status).toBe(403); // Forbidden
+  expect(result.body.error).toContain('Access denied');
+});
+```
+
+## Troubleshooting
+
+### Common Issues
+
+<AccordionGroup>
+  <Accordion title="User cannot see any data after login">
+    **Cause**: User not associated with any tenant
+
+    **Solution**: Check `tenant_users` table and add user-tenant mapping
+
+    ```sql
+    INSERT INTO tenant_users (user_id, tenant_id, role, is_active)
+    VALUES ('user-uuid', 'tenant-uuid', 'lawyer', true);
+    ```
+  </Accordion>
+
+  <Accordion title="Domain not resolving to correct tenant">
+    **Cause**: Missing or inactive domain mapping
+
+    **Solution**: Verify `tenant_domains` table has active entry
+
+    ```sql
+    SELECT * FROM tenant_domains WHERE domain = 'yourlawfirm.juryo.ai';
+    ```
+
+    Ensure `is_active = true`
+  </Accordion>
+
+  <Accordion title="Files not accessible after upload">
+    **Cause**: Tenant prefix mismatch or incorrect GCS permissions
+
+    **Solution**: Check file path includes hashed tenant ID and signed URL is valid
+
+    Verify GCS bucket has proper IAM permissions for service account
+  </Accordion>
+
+  <Accordion title="Webhook receiving wrong tenant's data">
+    **Cause**: Incorrect `x-tenant-id` header or missing validation
+
+    **Solution**: Verify webhook configuration includes correct tenant ID
+
+    Implement HMAC signature verification to prevent spoofing
+  </Accordion>
+</AccordionGroup>
+
+## Related Documentation
+
+<CardGroup cols={2}>
+  <Card
+    title="Security Best Practices"
+    icon="shield-check"
+    href="/developers/best-practices/security"
+  >
+    Comprehensive security guidelines for developers
+  </Card>
+  <Card
+    title="Database Schema"
+    icon="database"
+    href="/developers/architecture/database-schema"
+  >
+    Complete schema with tenant relationships
+  </Card>
+  <Card
+    title="Authentication System"
+    icon="key"
+    href="/developers/architecture/authentication"
+  >
+    How Replit Auth and sessions work
+  </Card>
+  <Card
+    title="API Multi-Tenant Headers"
+    icon="code"
+    href="/api-reference/multi-tenant-headers"
+  >
+    Using x-tenant-id in API requests
+  </Card>
+</CardGroup>

@@ -1,0 +1,510 @@
+---
+title: "Platform Overview"
+description: "Complete overview of Juryo's features, architecture, and capabilities"
+---
+
+## About Juryo
+
+Juryo is a comprehensive multi-tenant legal SaaS platform designed specifically for law firms. It bridges communication, sales, and legal operations into one integrated system, enabling firms to manage their entire client lifecycle from initial contact to case closure.
+
+### Key Value Propositions
+
+- **Complete Client Lifecycle Management** - Track leads from first contact through case completion
+- **Real-time Multi-Channel Communication** - Engage clients via WhatsApp, voice calls, email, and SMS
+- **AI-Powered Intelligence** - Automate document review and conversation analysis with Google Gemini AI
+- **Advanced Analytics** - Data-driven insights into pipeline performance, conversion rates, and team productivity
+- **Extensible Architecture** - Open API and webhook system for seamless integrations
+
+## Core Features
+
+### 1. Contact & Opportunity Management
+
+#### Unified Contact Lifecycle
+Juryo replaces separate "leads" and "clients" with a single **Contact** entity that evolves through lifecycle stages:
+
+| Stage | Description | Use Case |
+|-------|-------------|----------|
+| **Lead** | Initial contact, not yet qualified | First inquiry from website or referral |
+| **Prospect** | Qualified and showing interest | Had initial conversation, fit confirmed |
+| **Qualified Lead** | Ready for consultation | Budget and timeline confirmed |
+| **Client** | Actively working with your firm | Contract signed, case in progress |
+| **Former Client** | Past client relationship | Case completed or client departed |
+
+**Key Capabilities:**
+- Track acquisition source (WhatsApp, calls, website, referrals)
+- Maintain complete communication history
+- Link multiple opportunities to one contact
+- Store external system IDs for CRM sync
+
+Learn more: [Contact Management](/features/contact-management)
+
+#### 7-Stage Opportunity Pipeline
+
+Opportunities represent potential cases moving through your sales funnel:
+
+```
+Lead → Contacted → Qualified → Appointment Booked → Proposal Sent → Won → Lost
+```
+
+**Features:**
+- **Drag-and-drop Kanban board** for visual pipeline management
+- **Conversion analytics** at each stage
+- **Automated progression** based on communication analysis
+- **Service type categorization** (immigration, business law, family law, etc.)
+- **Revenue forecasting** with estimated values and probabilities
+
+**Pipeline Metrics:**
+- Conversion rates between stages
+- Average time in each stage
+- Win/loss ratios by source
+- Revenue pipeline by legal area
+
+Learn more: [Opportunity Pipeline](/features/opportunity-pipeline)
+
+### 2. Case Management System
+
+Once an opportunity converts, it becomes a **Case** - representing active legal work.
+
+#### Case Lifecycle
+
+Cases progress through customizable statuses:
+- **Consultation** - Initial case review
+- **Active** - Work in progress
+- **Waiting on Client** - Awaiting client documents or payment
+- **Waiting on Third Party** - External dependencies
+- **Completed** - Case closed successfully
+- **Cancelled** - Case terminated
+
+#### Document Management
+
+**Upload & Organization:**
+- Google Cloud Storage integration with 7-year retention
+- Tenant-isolated file storage with SHA-256 hashing
+- Support for PDFs, images, and various document types
+- Link documents to specific case requirements
+
+**AI-Powered Review:**
+- Automated document validation using Google Gemini AI
+- Match uploaded documents against legal process requirements
+- Confidence scoring (0-100%) for approval decisions
+- Feedback on missing or incorrect information
+
+**Example Use Case:**
+For an H-1B visa case, Juryo can automatically verify that uploaded passport meets specific requirements (valid expiration, correct format, readable text).
+
+Learn more: [Case Management](/features/case-management) | [Document Management](/features/document-management)
+
+### 3. Real-time Communications
+
+Juryo consolidates all client interactions into a unified communication system.
+
+#### WhatsApp Integration
+
+**Two-way Messaging:**
+- Send and receive WhatsApp messages directly in Juryo
+- Conversation threading with message history
+- Assignment to specific team members
+- 24-hour messaging window compliance (HubSpot-style template selector)
+
+**Automatic Contact Creation:**
+- New WhatsApp messages automatically create contacts
+- Link messages to opportunities and cases
+- Track engagement metrics and response times
+
+**Configuration:**
+- WhatsApp Business API integration
+- Phone number mapping to tenants
+- Webhook processing for real-time updates
+
+Learn more: [WhatsApp Integration](/integrations/whatsapp/overview)
+
+#### Voice AI Integration
+
+**Retell AI Call Handling:**
+- Automated call answering and conversation intelligence
+- Real-time transcription and analysis
+- Lead qualification based on conversation content
+- Call success rate tracking
+
+**Intelligent Routing:**
+- Map Retell AI agents to specific tenants
+- Assign agents to legal areas (immigration, business, etc.)
+- Route calls to appropriate attorney based on practice area
+
+**Analytics:**
+- Call duration and connection success rates
+- Sentiment analysis of conversations
+- Appointment booking detection
+- Follow-up requirement identification
+
+Learn more: [Voice Integration](/integrations/voice/overview)
+
+#### Unified Communication History
+
+All interactions stored in one table:
+- **retell_call** - Voice conversations
+- **whatsapp_message** - WhatsApp chats
+- **email** - Email correspondence
+- **sms** - Text messages
+- **in_person** - Office meetings
+- **system_note** - Internal notes
+
+Each communication includes:
+- Direction (inbound/outbound/internal)
+- Timestamp and duration
+- Analysis fields (sentiment, priority, follow-up required)
+- Links to contact, opportunity, and case
+
+### 4. Advanced Analytics & Reporting
+
+#### Opportunity Funnel Analytics
+
+**Conversion Metrics:**
+- Stage-by-stage conversion rates
+- Drop-off analysis to identify bottlenecks
+- Average time in each pipeline stage
+- Win/loss ratios by source channel
+
+**Revenue Forecasting:**
+- Pipeline value by stage
+- Probability-weighted revenue projections
+- Monthly/quarterly trends
+- Team member performance comparison
+
+#### Communication Analytics
+
+**Channel Performance:**
+- Success rates by communication type
+- Response time benchmarks
+- Engagement patterns (time of day, day of week)
+- Client responsiveness scoring
+
+**Team Metrics:**
+- Individual attorney performance
+- Case load distribution
+- Communication volume by team member
+- Client satisfaction indicators
+
+#### Payment Tracking
+
+**Financial Management:**
+- Payment plan creation with installment schedules
+- Status tracking (pending, paid, overdue, cancelled)
+- Automated payment reminders
+- Revenue recognition by period
+
+Learn more: [Analytics & Reporting](/analytics/opportunity-analytics)
+
+### 5. Automation & Workflows
+
+#### Automation Rules Engine
+
+Create conditional automation based on triggers:
+
+**Trigger Types:**
+- **Opportunity Stage Change** - e.g., When opportunity moves to "Won"
+- **Payment Status Update** - e.g., When payment becomes overdue
+- **Scheduled Time** - e.g., Every Monday at 9am
+- **Case Status Change** - e.g., When case completes
+- **Communication Event** - e.g., After WhatsApp message received
+
+**Actions:**
+- Create tasks for team members
+- Send webhooks to external systems
+- Update entity fields
+- Trigger additional flows
+- Send notifications
+
+**Example Automation:**
+```
+Trigger: Opportunity reaches "Won" stage
+Conditions: Service type is "Immigration"
+Actions:
+  1. Create case with immigration legal process
+  2. Send Slack notification to immigration team
+  3. Create task "Schedule initial consultation"
+  4. Send webhook to CRM with updated status
+```
+
+#### Task Management
+
+**Scheduled Tasks:**
+- Automated follow-ups with contacts
+- Reminder tasks for deadlines
+- Recurring check-ins
+- Document collection reminders
+
+**Task Execution:**
+- Background job processor runs every 60 seconds
+- Retry logic with exponential backoff
+- Error tracking and notifications
+- Task dependency management
+
+#### Flow Templates
+
+Pre-built automation workflows for common scenarios:
+- Lead nurturing sequences
+- Client onboarding checklists
+- Document collection flows
+- Case milestone reminders
+
+Learn more: [Automation & Workflows](/integrations/automation/automation-rules)
+
+### 6. Webhook Integration System
+
+Connect Juryo to external systems for bidirectional data sync.
+
+#### Outgoing Webhooks
+
+**Event-based Notifications:**
+- Opportunity stage changes
+- Case status updates
+- Payment events
+- Document uploads
+
+**Configuration:**
+- Per-tenant webhook endpoints
+- HMAC-SHA256 signature verification
+- Configurable headers and timeouts
+- Delivery tracking and retry logic
+
+**Delivery Management:**
+- View delivery logs with request/response bodies
+- Track success/failure rates
+- Monitor response times
+- Retry failed deliveries manually
+
+#### Incoming Webhooks
+
+**External Data Reception:**
+- `/api/webhook/contact-opportunity` - Create contacts/opportunities from external systems
+- `/api/webhook/whatsapp` - Process WhatsApp message events
+- `/api/webhook/retell` - Handle Retell AI call analysis
+
+**Query Endpoints:**
+External systems can query Juryo data:
+- `GET /api/webhook/contacts` - Find contacts by email, phone, or externalID
+- `GET /api/webhook/opportunities` - Query opportunities with nested contact data
+
+Learn more: [Webhook System](/integrations/webhooks/overview)
+
+## Multi-Tenant Architecture
+
+### Complete Data Isolation
+
+Every law firm (tenant) has completely isolated data:
+- **Separate database records** - All tables include `tenantId` foreign key
+- **Domain-based routing** - Each firm has custom subdomain (e.g., `saldados.juryo.ai`)
+- **Isolated file storage** - Google Cloud Storage with tenant-prefixed paths
+- **Independent configurations** - Legal areas, processes, and workflows per tenant
+
+### Tenant Resolution
+
+Juryo identifies the tenant from:
+1. **Domain name** - Subdomain mapping in `tenant_domains` table
+2. **User association** - Current user's tenant membership
+3. **Header override** - `x-tenant-id` header for webhooks and API calls
+
+<Snippet file="tenant-scope-warning.mdx" />
+
+Learn more: [Multi-Tenant Architecture](/multi-tenant-architecture)
+
+## Technology Stack
+
+### Backend
+
+| Component | Technology | Purpose |
+|-----------|------------|---------|
+| **Web Framework** | Express.js | API server and routing |
+| **Language** | TypeScript | Type-safe backend code |
+| **Database** | PostgreSQL | Primary data store |
+| **ORM** | Drizzle ORM | Type-safe database queries |
+| **Authentication** | Replit Auth | OIDC-based user login |
+| **File Storage** | Google Cloud Storage | Document management |
+| **AI** | Google Gemini | Document review and analysis |
+| **Real-time** | WebSockets (WS) | Live updates |
+| **Session** | PostgreSQL + MemoryStore | Session management |
+
+### Frontend
+
+| Component | Technology | Purpose |
+|-----------|------------|---------|
+| **Framework** | React 18 | UI rendering |
+| **Router** | Wouter | Lightweight routing |
+| **State** | TanStack Query v5 | Server state management |
+| **UI Library** | Radix UI + shadcn/ui | Component primitives |
+| **Styling** | Tailwind CSS | Utility-first styling |
+| **Forms** | React Hook Form | Form handling |
+| **Validation** | Zod | Schema validation |
+| **Charts** | Recharts | Analytics visualization |
+| **i18n** | i18next | English/Spanish support |
+
+### Development & Build
+
+| Component | Technology |
+|-----------|------------|
+| **Build Tool** | Vite |
+| **Package Manager** | npm |
+| **Type Checking** | TypeScript 5.6 |
+| **Database Migrations** | Drizzle Kit |
+| **Backend Build** | esbuild |
+
+Learn more: [Technology Stack](/developers/architecture/tech-stack)
+
+## API & Extensibility
+
+### REST API
+
+Juryo provides a comprehensive REST API for all platform operations:
+
+- **Authentication** - Replit Auth with session management
+- **Contacts & Opportunities** - CRUD operations and queries
+- **Cases & Documents** - Case management and file operations
+- **Communications** - Send messages, query conversation history
+- **Analytics** - Retrieve metrics and reports
+- **Webhooks** - Configure and manage integrations
+
+All endpoints support multi-tenant scoping and standard error formats.
+
+Learn more: [API Reference](/api-reference/introduction)
+
+### Voice Agent API
+
+Special endpoints for Retell AI voice agent integration:
+- Query cases during live calls
+- Create contacts from voice interactions
+- Link calls to opportunities
+- Access legal process information for accurate responses
+
+Learn more: [Voice Agent API](/api-reference/voice/overview)
+
+## Security & Compliance
+
+### Data Protection
+
+- **Multi-tenant isolation** - Complete data separation per firm
+- **Encrypted file storage** - Files encrypted at rest in GCS
+- **Secure sessions** - PostgreSQL-backed session store
+- **HMAC webhook signatures** - Verify webhook authenticity
+
+### Access Control
+
+- **Role-based permissions** - Admin, Lawyer, Client roles
+- **Tenant-scoped access** - Users can only access their tenant's data
+- **Session-based authentication** - Secure cookie-based sessions
+- **OIDC integration** - Replit Auth for identity management
+
+### Best Practices
+
+- Always filter database queries by `tenantId`
+- Never expose sensitive data in logs or error messages
+- Validate all API inputs with Zod schemas
+- Use signed URLs for temporary file access
+
+Learn more: [Security Best Practices](/developers/best-practices/security)
+
+## Deployment & Infrastructure
+
+### Environment Requirements
+
+**Required Services:**
+- PostgreSQL database (Neon serverless recommended)
+- Google Cloud Storage bucket
+- Google Gemini API access
+- Replit Auth configuration
+
+**Optional Services:**
+- WhatsApp Business API
+- Retell AI account
+- External webhook endpoints
+
+### Configuration
+
+**Environment Variables:**
+- `DATABASE_URL` - PostgreSQL connection string
+- `SESSION_SECRET` - Session encryption key
+- `GEMINI_API_KEY` - Google AI API key
+- `GOOGLE_APPLICATION_CREDENTIALS` - GCS service account JSON
+- `REPL_ID` - Replit application ID
+- `WHATSAPP_API_KEY` - WhatsApp Business API credentials
+- `RETELL_API_KEY` - Retell AI API credentials
+
+Learn more: [Environment Variables](/developers/environment-variables)
+
+### Performance Characteristics
+
+- **API Response Times** - Sub-100ms for most queries
+- **WebSocket Connections** - Real-time updates with minimal latency
+- **Background Jobs** - Task execution every 60 seconds
+- **File Upload** - Supports files up to 50MB
+- **Database Queries** - Indexed for tenant-scoped operations
+
+## Getting Started
+
+<CardGroup cols={3}>
+  <Card
+    title="Quickstart Guide"
+    icon="rocket"
+    href="/quickstart"
+  >
+    Create your first contact, opportunity, and case in 10 minutes
+  </Card>
+  <Card
+    title="API Documentation"
+    icon="code"
+    href="/api-reference/introduction"
+  >
+    Explore the complete REST API with code examples
+  </Card>
+  <Card
+    title="Developer Setup"
+    icon="laptop-code"
+    href="/developers/local-setup"
+  >
+    Set up your local development environment
+  </Card>
+</CardGroup>
+
+## Feature Deep Dives
+
+Explore detailed documentation for each feature:
+
+<CardGroup cols={2}>
+  <Card
+    title="Contact Management"
+    icon="users"
+    href="/features/contact-management"
+  >
+    Lead-to-client lifecycle tracking
+  </Card>
+  <Card
+    title="Opportunity Pipeline"
+    icon="chart-line"
+    href="/features/opportunity-pipeline"
+  >
+    7-stage sales funnel with Kanban
+  </Card>
+  <Card
+    title="Case Management"
+    icon="scale-balanced"
+    href="/features/case-management"
+  >
+    From consultation to case closure
+  </Card>
+  <Card
+    title="Communications"
+    icon="messages"
+    href="/features/communications"
+  >
+    WhatsApp, voice, email, and SMS
+  </Card>
+</CardGroup>
+
+## Support
+
+<Info>
+**Need Help?**
+- **Email**: nino.caminhante@antaiventures.com
+- **Documentation**: Comprehensive guides for all features
+- **GitHub**: Report issues or contribute
+</Info>

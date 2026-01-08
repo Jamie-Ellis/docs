@@ -1,0 +1,315 @@
+---
+title: "WhatsApp Webhook Configuration"
+description: "Technical details for WhatsApp webhook integration"
+---
+
+## Webhook Endpoint
+
+Juryo receives WhatsApp messages via webhook:
+
+```
+POST https://your-tenant.juryo.ai/api/webhook/whatsapp
+```
+
+**Implementation:** `server/routes.ts` handles incoming webhooks
+
+## Webhook Verification
+
+When you configure the webhook in Meta Business Suite, WhatsApp sends a verification request.
+
+### Verification Request
+
+**Method:** `GET`
+
+**Parameters:**
+- `hub.mode` - Always "subscribe"
+- `hub.verify_token` - Token you provided in Meta setup
+- `hub.challenge` - Random string to echo back
+
+**Juryo Response:**
+If verify token matches, returns `hub.challenge` value.
+
+**Default Verify Token:** `juryo-whatsapp-verify`
+
+To customize, set environment variable:
+```bash
+WHATSAPP_VERIFY_TOKEN=your-custom-token
+```
+
+## Webhook Events
+
+### Message Received
+
+When someone sends a message:
+
+```json
+{
+  "object": "whatsapp_business_account",
+  "entry": [{
+    "changes": [{
+      "value": {
+        "messaging_product": "whatsapp",
+        "metadata": {
+          "phone_number_id": "123456789012345"
+        },
+        "contacts": [{
+          "profile": { "name": "John Doe" },
+          "wa_id": "1234567890"
+        }],
+        "messages": [{
+          "from": "1234567890",
+          "id": "wamid.xxx",
+          "timestamp": "1704729600",
+          "text": { "body": "Hello, I need help with my visa" },
+          "type": "text"
+        }]
+      }
+    }]
+  }]
+}
+```
+
+**Juryo Processing:**
+1. Extracts phone number and message text
+2. Finds or creates contact by phone
+3. Stores message in `whatsappMessages` table
+4. Links to conversation in `whatsappConversations`
+5. Returns 200 OK to WhatsApp
+
+### Message Status Update
+
+Delivery/read receipts:
+
+```json
+{
+  "entry": [{
+    "changes": [{
+      "value": {
+        "statuses": [{
+          "id": "wamid.xxx",
+          "status": "delivered",
+          "timestamp": "1704729601"
+        }]
+      }
+    }]
+  }]
+}
+```
+
+**Status Values:**
+- `sent` - Sent to WhatsApp server
+- `delivered` - Delivered to recipient's device
+- `read` - Read by recipient
+- `failed` - Failed to deliver
+
+## Security
+
+### Webhook Signature Verification
+
+WhatsApp signs all webhook requests for security.
+
+**Header:** `X-Hub-Signature-256`
+
+**Format:** `sha256=<signature>`
+
+**Verification Process:**
+1. Extract signature from header
+2. Compute HMAC-SHA256 of request body using app secret
+3. Compare signatures
+4. Reject if mismatch
+
+**Juryo Implementation:**
+```typescript
+// server/routes.ts
+const signature = req.headers['x-hub-signature-256'];
+const expected = crypto
+  .createHmac('sha256', process.env.WHATSAPP_APP_SECRET)
+  .update(JSON.stringify(req.body))
+  .digest('hex');
+
+if (`sha256=${expected}` !== signature) {
+  return res.status(403).json({ error: 'Invalid signature' });
+}
+```
+
+<Warning>
+**Production Security**
+
+Always verify webhook signatures in production to prevent spoofed requests.
+</Warning>
+
+## Error Handling
+
+### Failed Webhook Processing
+
+If Juryo fails to process a webhook:
+
+1. **Logs error** to console/monitoring
+2. **Returns 500** status code
+3. **WhatsApp retries** with exponential backoff
+
+**Retry Schedule:**
+- Immediate retry
+- After 15 seconds
+- After 1 minute
+- After 5 minutes
+- Up to 10 attempts total
+
+### Common Errors
+
+**Database Connection Failure:**
+```
+Error: Failed to create contact
+```
+**Solution:** Check DATABASE_URL and database accessibility
+
+**Invalid Phone Number:**
+```
+Error: Phone number format invalid
+```
+**Solution:** Ensure phone numbers include country code (+1234567890)
+
+**Duplicate Message:**
+```
+Warning: Message already exists
+```
+**Note:** This is normal during WhatsApp retries. Juryo handles deduplication.
+
+## Testing Webhooks
+
+### Manual Test
+
+Send test webhook with curl:
+
+```bash
+curl -X POST 'https://your-tenant.juryo.ai/api/webhook/whatsapp' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "object": "whatsapp_business_account",
+    "entry": [{
+      "changes": [{
+        "value": {
+          "messaging_product": "whatsapp",
+          "metadata": { "phone_number_id": "123456789012345" },
+          "contacts": [{
+            "profile": { "name": "Test User" },
+            "wa_id": "1234567890"
+          }],
+          "messages": [{
+            "from": "1234567890",
+            "id": "test-message-id",
+            "timestamp": "1704729600",
+            "text": { "body": "Test message" },
+            "type": "text"
+          }]
+        }
+      }]
+    }]
+  }'
+```
+
+**Expected Response:** `200 OK`
+
+### Meta Business Suite Test
+
+1. Go to **WhatsApp Manager** → **Webhook**
+2. Click **Test** button
+3. Select event type: `messages`
+4. Click **Send Test Event**
+5. Verify Juryo receives and processes
+
+## Monitoring
+
+### Webhook Logs
+
+Check server logs for webhook activity:
+
+```bash
+# Development
+npm run dev
+# Watch for: [webhook] WhatsApp message received
+
+# Production
+tail -f /var/log/juryo/webhook.log
+```
+
+### Database Verification
+
+Verify messages are stored:
+
+```sql
+-- Check recent WhatsApp messages
+SELECT * FROM whatsapp_messages
+ORDER BY timestamp DESC
+LIMIT 10;
+
+-- Check conversations
+SELECT * FROM whatsapp_conversations
+WHERE last_message_at > NOW() - INTERVAL '1 day';
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Webhook returns 404">
+    **Cause:** URL incorrect or Juryo not running
+
+    **Solutions:**
+    - Verify URL: `https://your-tenant.juryo.ai/api/webhook/whatsapp`
+    - Check Juryo is running: `curl https://your-tenant.juryo.ai/health`
+    - Verify DNS resolves correctly
+  </Accordion>
+
+  <Accordion title="Messages received but not in Juryo">
+    **Cause:** Processing error, likely database or authentication
+
+    **Solutions:**
+    - Check server logs for errors
+    - Verify DATABASE_URL is accessible
+    - Ensure tenant-id resolution works
+    - Test manual webhook with curl
+  </Accordion>
+
+  <Accordion title="WhatsApp shows 'webhook failed'">
+    **Cause:** Juryo not responding within timeout (20 seconds)
+
+    **Solutions:**
+    - Optimize database queries
+    - Check for slow external API calls
+    - Ensure adequate server resources
+    - Process webhooks asynchronously
+  </Accordion>
+</AccordionGroup>
+
+## Related Documentation
+
+<CardGroup cols={2}>
+  <Card
+    title="WhatsApp Setup"
+    icon="gear"
+    href="/integrations/whatsapp/setup"
+  >
+    Complete setup guide for WhatsApp integration
+  </Card>
+  <Card
+    title="WhatsApp Overview"
+    icon="comment"
+    href="/integrations/whatsapp/overview"
+  >
+    Feature overview and capabilities
+  </Card>
+  <Card
+    title="Webhook System"
+    icon="webhook"
+    href="/integrations/webhooks/overview"
+  >
+    General webhook integration documentation
+  </Card>
+  <Card
+    title="Security Best Practices"
+    icon="shield-check"
+    href="/developers/best-practices/security"
+  >
+    Security guidelines for webhooks
+  </Card>
+</CardGroup>

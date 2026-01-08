@@ -1,0 +1,17 @@
+All API errors follow this standard format:
+
+```json
+{
+  "success": false,
+  "error": "Human-readable error message",
+  "details": "Optional technical details for debugging"
+}
+```
+
+Common HTTP status codes:
+- `200` - Success
+- `400` - Bad Request (invalid input)
+- `401` - Unauthorized (not logged in)
+- `403` - Forbidden (no permission)
+- `404` - Not Found
+- `500` - Internal Server Error

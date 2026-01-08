@@ -1,0 +1,578 @@
+---
+title: "Environment Variables"
+description: "Complete reference for all Juryo configuration options"
+---
+
+## Overview
+
+Juryo uses environment variables for configuration. All variables are loaded from a `.env` file in the project root during development, and from the hosting environment in production.
+
+<Warning>
+**Never Commit Secrets**
+
+Never commit `.env` files to version control. Add `.env` to `.gitignore`. Use `.env.example` as a template.
+</Warning>
+
+## Quick Reference
+
+```bash
+# Required for basic operation
+DATABASE_URL=postgresql://...
+SESSION_SECRET=random-32-char-string
+REPL_ID=your-repl-id
+
+# Optional integrations
+GEMINI_API_KEY=your-api-key
+GOOGLE_APPLICATION_CREDENTIALS='{"type":"service_account",...}'
+WHATSAPP_API_KEY=your-whatsapp-token
+RETELL_API_KEY=your-retell-key
+```
+
+## Required Variables
+
+### DATABASE_URL
+
+**Description:** PostgreSQL connection string
+
+**Format:**
+```bash
+# Standard PostgreSQL
+DATABASE_URL=postgresql://username:password@host:port/database
+
+# Neon serverless (recommended)
+DATABASE_URL=postgresql://username:password@ep-xxx.region.aws.neon.tech/dbname?sslmode=require
+
+# Local development
+DATABASE_URL=postgresql://localhost:5432/juryo_dev
+```
+
+**Used By:**
+- Database connections via Drizzle ORM
+- Server startup validation
+- Migration scripts
+
+**Example:**
+```bash
+DATABASE_URL=postgresql://juryo_user:secret_password@localhost:5432/juryo_production
+```
+
+<Note>
+For Neon and other cloud providers, always include `?sslmode=require` at the end of the connection string.
+</Note>
+
+### SESSION_SECRET
+
+**Description:** Secret key for encrypting session cookies
+
+**Format:** Random 32+ character string
+
+**Generate:**
+```bash
+# Method 1: Node.js crypto
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+
+# Method 2: OpenSSL
+openssl rand -hex 32
+
+# Method 3: Online generator
+# Use a password generator with 32+ characters
+```
+
+**Example:**
+```bash
+SESSION_SECRET=a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0u1v2w3x4y5z6
+```
+
+**Security:**
+- Use different secrets for development, staging, and production
+- Rotate periodically (requires all users to re-login)
+- Never share or expose publicly
+
+### REPL_ID
+
+**Description:** Replit application ID for OAuth authentication
+
+**Format:** String identifier
+
+**Where to Find:**
+- Replit project settings
+- URL: `https://replit.com/@username/project-name`
+
+**Example:**
+```bash
+REPL_ID=your-repl-project-id
+```
+
+**Used For:**
+- Replit Auth OIDC configuration
+- OAuth callback URL validation
+- User authentication flow
+
+### ISSUER_URL
+
+**Description:** OIDC issuer URL for Replit Auth
+
+**Default:** `https://replit.com/oidc`
+
+**Example:**
+```bash
+ISSUER_URL=https://replit.com/oidc
+```
+
+**Note:** This typically doesn't need to be changed unless using a custom auth provider.
+
+## Optional Integration Variables
+
+### Google Cloud Storage
+
+#### GOOGLE_APPLICATION_CREDENTIALS
+
+**Description:** Service account JSON for Google Cloud Storage access
+
+**Format:** JSON string (entire service account file)
+
+**Setup:**
+1. Create service account in Google Cloud Console
+2. Grant "Storage Admin" role
+3. Download JSON key file
+4. Set as environment variable (entire JSON as string)
+
+**Example:**
+```bash
+GOOGLE_APPLICATION_CREDENTIALS='{"type":"service_account","project_id":"your-project","private_key_id":"xxx","private_key":"-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n","client_email":"service-account@project.iam.gserviceaccount.com","client_id":"123456789","auth_uri":"https://accounts.google.com/o/oauth2/auth","token_uri":"https://oauth2.googleapis.com/token","auth_provider_x509_cert_url":"https://www.googleapis.com/oauth2/v1/certs","client_x509_cert_url":"https://www.googleapis.com/robot/v1/metadata/x509/..."}'
+```
+
+**Alternative:** File path (not recommended for production)
+```bash
+GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json
+```
+
+#### GOOGLE_CLOUD_PROJECT_ID
+
+**Description:** GCP project ID
+
+**Example:**
+```bash
+GOOGLE_CLOUD_PROJECT_ID=juryo-production-12345
+```
+
+#### GOOGLE_CLOUD_STORAGE_BUCKET
+
+**Description:** GCS bucket name for document storage
+
+**Default:** `legal-ai-saas-documents`
+
+**Example:**
+```bash
+GOOGLE_CLOUD_STORAGE_BUCKET=juryo-documents-prod
+```
+
+**Setup:**
+1. Create bucket in Google Cloud Console
+2. Set appropriate permissions
+3. Configure lifecycle policies (7-year retention recommended)
+
+**Without These:** Document upload features will fail.
+
+### Google Gemini AI
+
+#### GEMINI_API_KEY
+
+**Description:** API key for Google Generative AI (Gemini)
+
+**Used For:**
+- AI document review
+- Document analysis and validation
+- Requirement matching
+
+**Get Key:**
+1. Visit [Google AI Studio](https://makersuite.google.com/app/apikey)
+2. Create new API key
+3. Copy key
+
+**Example:**
+```bash
+GEMINI_API_KEY=AIzaSyDxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+```
+
+**Without This:** AI document review features won't work.
+
+### WhatsApp Business API
+
+#### WHATSAPP_API_URL
+
+**Description:** WhatsApp Business API base URL
+
+**Default:** `https://graph.facebook.com/v17.0`
+
+**Example:**
+```bash
+WHATSAPP_API_URL=https://graph.facebook.com/v17.0
+```
+
+#### WHATSAPP_API_KEY
+
+**Description:** WhatsApp Business API access token
+
+**Get Token:**
+1. Meta Business Suite
+2. WhatsApp Business Account
+3. Generate permanent access token
+
+**Example:**
+```bash
+WHATSAPP_API_KEY=EAAxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+```
+
+#### WHATSAPP_PHONE_NUMBER_ID
+
+**Description:** WhatsApp Business phone number ID
+
+**Format:** Numeric ID from Meta
+
+**Example:**
+```bash
+WHATSAPP_PHONE_NUMBER_ID=123456789012345
+```
+
+**Without These:** WhatsApp integration features won't work.
+
+### Retell AI (Voice Agent)
+
+#### RETELL_API_KEY
+
+**Description:** Retell AI API key for voice agent integration
+
+**Get Key:**
+1. Sign up at [Retell AI](https://www.retellai.com/)
+2. Create API key in dashboard
+
+**Example:**
+```bash
+RETELL_API_KEY=key_xxxxxxxxxxxxxxxxxxxxx
+```
+
+**Used For:**
+- Voice agent configuration
+- Call transcript retrieval
+- Agent-to-tenant mapping
+
+**Without This:** Voice integration features won't work.
+
+### External Integration (Optional)
+
+#### KAPSO_API_KEY
+
+**Description:** API key for Kapso external integration (if used)
+
+**Example:**
+```bash
+KAPSO_API_KEY=your-kapso-api-key
+```
+
+**Note:** Only needed if integrating with Kapso services.
+
+## Runtime Variables
+
+### NODE_ENV
+
+**Description:** Environment mode
+
+**Values:**
+- `development` - Local development
+- `production` - Production deployment
+- `test` - Testing environment
+
+**Example:**
+```bash
+NODE_ENV=production
+```
+
+**Affects:**
+- Logging verbosity
+- Error message detail
+- Performance optimizations
+- Session configuration
+
+**Auto-set by:**
+- `npm run dev` → `development`
+- `npm start` → `production`
+
+### PORT
+
+**Description:** Server port (usually auto-configured)
+
+**Default:** `5000`
+
+**Example:**
+```bash
+PORT=5000
+```
+
+**Note:** In development, Vite runs on 5173 and proxies to port 5000.
+
+## Configuration by Environment
+
+### Development (.env.local)
+
+```bash
+# Database
+DATABASE_URL=postgresql://localhost:5432/juryo_dev
+
+# Session
+SESSION_SECRET=dev-secret-change-in-production
+
+# Replit Auth (mock for local dev)
+REPL_ID=dev-repl-id
+ISSUER_URL=https://replit.com/oidc
+
+# Optional: Mock services or use test accounts
+GEMINI_API_KEY=test-api-key
+# Leave GCS variables empty - uploads will fail gracefully
+```
+
+### Staging (.env.staging)
+
+```bash
+# Database
+DATABASE_URL=postgresql://user:pass@staging-db.neon.tech/juryo_staging?sslmode=require
+
+# Session
+SESSION_SECRET=staging-secret-different-from-prod
+
+# Replit Auth
+REPL_ID=staging-repl-id
+ISSUER_URL=https://replit.com/oidc
+
+# Real integrations with test accounts
+GEMINI_API_KEY=real-staging-api-key
+GOOGLE_APPLICATION_CREDENTIALS='{"type":"service_account",...}'
+GOOGLE_CLOUD_STORAGE_BUCKET=juryo-staging-documents
+WHATSAPP_API_KEY=staging-whatsapp-token
+WHATSAPP_PHONE_NUMBER_ID=staging-phone-id
+```
+
+### Production (.env.production)
+
+```bash
+# Database
+DATABASE_URL=postgresql://user:pass@prod-db.neon.tech/juryo_prod?sslmode=require
+
+# Session (use strong random secret)
+SESSION_SECRET=prod-secret-64-chars-long-random-string-here
+
+# Replit Auth
+REPL_ID=production-repl-id
+ISSUER_URL=https://replit.com/oidc
+
+# All integrations with production accounts
+GEMINI_API_KEY=production-gemini-api-key
+GOOGLE_APPLICATION_CREDENTIALS='{"type":"service_account",...}'
+GOOGLE_CLOUD_PROJECT_ID=juryo-production
+GOOGLE_CLOUD_STORAGE_BUCKET=juryo-prod-documents
+WHATSAPP_API_URL=https://graph.facebook.com/v17.0
+WHATSAPP_API_KEY=production-whatsapp-token
+WHATSAPP_PHONE_NUMBER_ID=production-phone-id
+RETELL_API_KEY=production-retell-key
+```
+
+## Security Best Practices
+
+<AccordionGroup>
+  <Accordion title="Use different secrets per environment">
+    **Why:** Compromised development secrets won't affect production
+
+    **How:**
+    - Generate unique SESSION_SECRET for each environment
+    - Use separate service accounts for staging/production
+    - Never copy production credentials to development
+  </Accordion>
+
+  <Accordion title="Rotate secrets periodically">
+    **Why:** Reduces impact of potential secret exposure
+
+    **How:**
+    - Rotate SESSION_SECRET quarterly (forces user re-login)
+    - Rotate API keys annually or when team members leave
+    - Update service account keys when compromised
+  </Accordion>
+
+  <Accordion title="Use secret management systems">
+    **Why:** Centralized secret storage with audit logs
+
+    **Options:**
+    - AWS Secrets Manager
+    - Google Secret Manager
+    - HashiCorp Vault
+    - Environment variables in hosting platform (Replit, Vercel, etc.)
+  </Accordion>
+
+  <Accordion title="Limit secret access">
+    **Why:** Principle of least privilege
+
+    **How:**
+    - Only senior developers need production secrets
+    - Use role-based access for secret management
+    - Audit who has accessed secrets
+  </Accordion>
+
+  <Accordion title="Never log secrets">
+    **Why:** Secrets in logs can be exposed
+
+    **How:**
+    - Filter environment variables from error logs
+    - Never console.log environment variables
+    - Use * placeholders in debug output
+  </Accordion>
+</AccordionGroup>
+
+## Validation
+
+Juryo validates required environment variables on startup.
+
+**Startup Checks:**
+```typescript
+// server/index.ts
+if (!process.env.DATABASE_URL) {
+  throw new Error('DATABASE_URL is required');
+}
+
+if (!process.env.SESSION_SECRET) {
+  throw new Error('SESSION_SECRET is required');
+}
+```
+
+**Validation Errors:**
+```
+Error: DATABASE_URL is required
+Error: SESSION_SECRET is required
+```
+
+**Fix:** Ensure all required variables are set in `.env`
+
+## Loading Environment Variables
+
+### Development
+
+Variables are loaded from `.env` automatically by Node.js:
+
+```bash
+# Create .env file
+cp .env.example .env
+
+# Edit with your values
+nano .env
+
+# Start server (auto-loads .env)
+npm run dev
+```
+
+### Production
+
+Set environment variables in your hosting platform:
+
+**Replit:**
+1. Go to project settings
+2. Secrets tab
+3. Add each variable
+
+**Vercel:**
+```bash
+vercel env add SESSION_SECRET
+```
+
+**Docker:**
+```bash
+docker run -e DATABASE_URL=postgresql://... juryo-app
+```
+
+**Kubernetes:**
+Create Secret resource:
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: juryo-secrets
+type: Opaque
+stringData:
+  DATABASE_URL: postgresql://...
+  SESSION_SECRET: xxx
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Environment variables not loading">
+    **Symptoms:** Variables return undefined
+
+    **Solutions:**
+    1. Ensure `.env` file exists in project root
+    2. Check variable names match exactly (case-sensitive)
+    3. Restart development server after .env changes
+    4. Verify no syntax errors in .env (no spaces around =)
+  </Accordion>
+
+  <Accordion title="Database connection fails">
+    **Symptoms:** `ECONNREFUSED` or connection timeout
+
+    **Solutions:**
+    1. Verify DATABASE_URL format is correct
+    2. Check database is running (if local)
+    3. Test connection with database client
+    4. Ensure firewall allows connections
+    5. For cloud databases, verify SSL mode
+  </Accordion>
+
+  <Accordion title="Authentication doesn't work">
+    **Symptoms:** Login redirects fail
+
+    **Solutions:**
+    1. Verify REPL_ID is set correctly
+    2. Check ISSUER_URL matches auth provider
+    3. Ensure SESSION_SECRET is set
+    4. Clear browser cookies and try again
+  </Accordion>
+
+  <Accordion title="File uploads fail">
+    **Symptoms:** Document upload errors
+
+    **Solutions:**
+    1. Verify GOOGLE_APPLICATION_CREDENTIALS is set
+    2. Check GCS bucket exists and is accessible
+    3. Validate service account has Storage Admin role
+    4. Test GCS connection independently
+  </Accordion>
+</AccordionGroup>
+
+## Related Documentation
+
+<CardGroup cols={2}>
+  <Card
+    title="Local Development Setup"
+    icon="laptop-code"
+    href="/developers/local-setup"
+  >
+    Complete setup guide for new developers
+  </Card>
+  <Card
+    title="Database Setup"
+    icon="database"
+    href="/developers/database-setup"
+  >
+    Database configuration and migrations
+  </Card>
+  <Card
+    title="Security Best Practices"
+    icon="shield-check"
+    href="/developers/best-practices/security"
+  >
+    Security guidelines for production
+  </Card>
+  <Card
+    title="Google Cloud Setup"
+    icon="cloud"
+    href="/integrations/google-cloud-storage"
+  >
+    Setting up GCS for document storage
+  </Card>
+</CardGroup>

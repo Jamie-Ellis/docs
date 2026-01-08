@@ -1,0 +1,711 @@
+---
+title: "Tenant Scoping Best Practices"
+description: "Critical security guidelines for multi-tenant data isolation"
+---
+
+## Overview
+
+Tenant scoping is the **most critical security concept** in Juryo. Every database query must be scoped to the correct tenant to prevent data leaks between law firms. Failure to properly scope queries can result in:
+
+- **Data breaches** - Law firms seeing each other's confidential client data
+- **Compliance violations** - GDPR, attorney-client privilege breaches
+- **Legal liability** - Exposing sensitive legal information to wrong parties
+- **Reputation damage** - Loss of trust and business
+
+<Warning>
+**Critical Security Rule**
+
+EVERY query on tenant-scoped tables MUST include a `WHERE tenantId = ?` filter. No exceptions.
+
+Missing tenant filters is the #1 security vulnerability in multi-tenant applications.
+</Warning>
+
+## The Golden Rule
+
+**Always filter by `tenantId` first in every query.**
+
+```typescript
+// ✅ CORRECT - Always include tenantId
+const contacts = await db.select()
+  .from(contacts)
+  .where(and(
+    eq(contacts.tenantId, currentTenantId),  // REQUIRED
+    eq(contacts.email, email)
+  ));
+
+// ❌ WRONG - Missing tenant filter (DATA BREACH!)
+const contacts = await db.select()
+  .from(contacts)
+  .where(eq(contacts.email, email));  // Will return ALL tenants' contacts!
+```
+
+## Tenant-Scoped Tables
+
+These tables MUST always be filtered by `tenantId`:
+
+### Core Entities
+- `contacts` - Client and lead information
+- `opportunities` - Sales pipeline
+- `cases` - Legal matters
+- `communications` - All interactions (WhatsApp, voice, email)
+
+### Supporting Tables
+- `documents` - Case files
+- `tasks` - Scheduled actions
+- `automation_rules` - Workflow automation
+- `webhook_configurations` - Integration settings
+- `whatsapp_conversations` - WhatsApp threads
+- `whatsapp_messages` - Individual messages
+- `retell_calls` - Voice call records
+
+### Non-Scoped Tables
+Only these tables are shared across tenants:
+- `tenants` - Law firm accounts
+- `users` - User accounts
+- `tenant_users` - User-tenant membership
+- `legal_areas` - Practice areas (global reference)
+- `legal_processes` - Procedures (global reference)
+
+<Tip>
+**Easy way to remember**: If a table has a `tenant_id` column, you MUST filter by it. Check the schema in `shared/schema.ts`.
+</Tip>
+
+## Database Query Patterns
+
+### Basic SELECT with Tenant Scope
+
+```typescript
+// ✅ CORRECT - Single record lookup
+const contact = await db.select()
+  .from(contacts)
+  .where(and(
+    eq(contacts.tenantId, tenantId),
+    eq(contacts.id, contactId)
+  ))
+  .limit(1);
+
+// ✅ CORRECT - List with pagination
+const contactList = await db.select()
+  .from(contacts)
+  .where(eq(contacts.tenantId, tenantId))
+  .orderBy(desc(contacts.createdAt))
+  .limit(50)
+  .offset(0);
+```
+
+### INSERT Operations
+
+```typescript
+// ✅ CORRECT - Always include tenantId on insert
+const [newContact] = await db.insert(contacts).values({
+  id: crypto.randomUUID(),
+  tenantId: currentTenantId,  // REQUIRED
+  firstName: 'John',
+  lastName: 'Doe',
+  email: 'john@example.com',
+}).returning();
+```
+
+<Warning>
+**Never trust client-provided tenant IDs**
+
+Always use the authenticated user's tenant from the session. Never accept `tenantId` from request body or query parameters.
+</Warning>
+
+### UPDATE Operations
+
+```typescript
+// ✅ CORRECT - Tenant scope in WHERE clause
+const updated = await db.update(contacts)
+  .set({
+    firstName: 'Jane',
+    updatedAt: new Date(),
+  })
+  .where(and(
+    eq(contacts.tenantId, tenantId),  // REQUIRED
+    eq(contacts.id, contactId)
+  ))
+  .returning();
+
+// ❌ WRONG - Missing tenant filter (could update wrong tenant's data!)
+const updated = await db.update(contacts)
+  .set({ firstName: 'Jane' })
+  .where(eq(contacts.id, contactId));  // DANGEROUS!
+```
+
+### DELETE Operations
+
+```typescript
+// ✅ CORRECT - Tenant scope prevents deleting other tenants' data
+const deleted = await db.delete(contacts)
+  .where(and(
+    eq(contacts.tenantId, tenantId),  // REQUIRED
+    eq(contacts.id, contactId)
+  ))
+  .returning();
+
+// ❌ WRONG - Could delete another tenant's contact!
+const deleted = await db.delete(contacts)
+  .where(eq(contacts.id, contactId));  // SECURITY BREACH!
+```
+
+## JOIN Operations
+
+When joining tables, **both tables must be scoped**:
+
+```typescript
+// ✅ CORRECT - Both tables filtered by tenantId
+const opportunitiesWithContacts = await db.select({
+  opportunity: opportunities,
+  contact: contacts,
+})
+  .from(opportunities)
+  .innerJoin(contacts, eq(opportunities.contactId, contacts.id))
+  .where(and(
+    eq(opportunities.tenantId, tenantId),  // Scope opportunities
+    eq(contacts.tenantId, tenantId)        // Scope contacts
+  ));
+
+// ❌ WRONG - Only filtering one table
+const opportunitiesWithContacts = await db.select()
+  .from(opportunities)
+  .innerJoin(contacts, eq(opportunities.contactId, contacts.id))
+  .where(eq(opportunities.tenantId, tenantId));  // contacts not scoped!
+```
+
+<Note>
+**Foreign keys ensure consistency**: If relationships are properly defined with foreign keys referencing `tenantId`, data integrity is enforced at the database level. However, you must still filter queries.
+</Note>
+
+## Transaction Safety
+
+All operations in a transaction must use the same `tenantId`:
+
+```typescript
+// ✅ CORRECT - Consistent tenant scoping in transaction
+await db.transaction(async (tx) => {
+  // Create contact
+  const [contact] = await tx.insert(contacts).values({
+    id: crypto.randomUUID(),
+    tenantId: tenantId,  // Same tenant
+    firstName: 'John',
+  }).returning();
+
+  // Create opportunity for same tenant
+  await tx.insert(opportunities).values({
+    id: crypto.randomUUID(),
+    tenantId: tenantId,  // Same tenant
+    contactId: contact.id,
+    title: 'Immigration Case',
+  });
+});
+
+// ❌ WRONG - Mixing tenants in transaction
+await db.transaction(async (tx) => {
+  await tx.insert(contacts).values({
+    tenantId: tenantIdA,  // Different tenants!
+  });
+
+  await tx.insert(opportunities).values({
+    tenantId: tenantIdB,  // WRONG!
+  });
+});
+```
+
+## Middleware Pattern
+
+The recommended pattern is to use middleware to automatically inject `tenantId`:
+
+```typescript
+// server/routes.ts - Tenant resolution middleware
+async function resolveTenant(req: Request, res: Response, next: Function) {
+  try {
+    // Get tenant from subdomain
+    const hostname = req.hostname;
+    const subdomain = hostname.split('.')[0];
+
+    // Look up tenant
+    const [tenant] = await db.select()
+      .from(tenants)
+      .where(eq(tenants.subdomain, subdomain))
+      .limit(1);
+
+    if (!tenant) {
+      return res.status(404).json({
+        success: false,
+        error: 'Tenant not found'
+      });
+    }
+
+    // Attach to request
+    req.tenantId = tenant.id;
+    next();
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: 'Failed to resolve tenant'
+    });
+  }
+}
+
+// Apply to all routes
+app.use('/api/*', resolveTenant);
+```
+
+With middleware, every request has `req.tenantId` available:
+
+```typescript
+// Route handlers can trust req.tenantId
+app.get('/api/contacts', async (req, res) => {
+  const contacts = await db.select()
+    .from(contacts)
+    .where(eq(contacts.tenantId, req.tenantId));  // From middleware
+
+  res.json({ success: true, data: contacts });
+});
+```
+
+<Tip>
+**TypeScript safety**: Extend Express Request type to include tenantId:
+
+```typescript
+// types/express.d.ts
+declare namespace Express {
+  export interface Request {
+    tenantId: string;
+  }
+}
+```
+</Tip>
+
+## Common Mistakes
+
+### Mistake 1: Forgetting Tenant Filter
+
+```typescript
+// ❌ WRONG - Developer forgets tenant filter
+app.get('/api/contacts/:id', async (req, res) => {
+  const contact = await db.select()
+    .from(contacts)
+    .where(eq(contacts.id, req.params.id));  // Missing tenant filter!
+
+  // Returns contact from ANY tenant!
+  res.json({ success: true, data: contact[0] });
+});
+
+// ✅ CORRECT
+app.get('/api/contacts/:id', async (req, res) => {
+  const contact = await db.select()
+    .from(contacts)
+    .where(and(
+      eq(contacts.tenantId, req.tenantId),    // Filter by tenant
+      eq(contacts.id, req.params.id)
+    ));
+
+  if (!contact[0]) {
+    return res.status(404).json({
+      success: false,
+      error: 'Contact not found'
+    });
+  }
+
+  res.json({ success: true, data: contact[0] });
+});
+```
+
+### Mistake 2: Trusting Client-Provided IDs
+
+```typescript
+// ❌ WRONG - Accepting tenantId from request body
+app.post('/api/contacts', async (req, res) => {
+  const { tenantId, firstName, lastName } = req.body;  // DANGEROUS!
+
+  // Attacker could specify any tenantId
+  const [contact] = await db.insert(contacts).values({
+    tenantId,  // From request body - SECURITY BREACH!
+    firstName,
+    lastName,
+  }).returning();
+
+  res.json({ success: true, data: contact });
+});
+
+// ✅ CORRECT - Use authenticated tenant only
+app.post('/api/contacts', async (req, res) => {
+  const { firstName, lastName } = req.body;
+
+  // Use tenant from middleware/session
+  const [contact] = await db.insert(contacts).values({
+    tenantId: req.tenantId,  // From authenticated session
+    firstName,
+    lastName,
+  }).returning();
+
+  res.json({ success: true, data: contact });
+});
+```
+
+### Mistake 3: Incomplete WHERE Clauses
+
+```typescript
+// ❌ WRONG - OR condition without tenant scope on both sides
+const results = await db.select()
+  .from(contacts)
+  .where(or(
+    eq(contacts.email, email),           // Not scoped!
+    eq(contacts.phone, phone)            // Not scoped!
+  ));
+
+// ✅ CORRECT - Tenant scope on entire query
+const results = await db.select()
+  .from(contacts)
+  .where(and(
+    eq(contacts.tenantId, tenantId),     // Scope entire query
+    or(
+      eq(contacts.email, email),
+      eq(contacts.phone, phone)
+    )
+  ));
+```
+
+### Mistake 4: COUNT Queries Without Scope
+
+```typescript
+// ❌ WRONG - Counting across all tenants
+const totalContacts = await db.select({
+  count: sql<number>`count(*)`
+})
+  .from(contacts);  // Missing tenant filter!
+
+// ✅ CORRECT - Count only current tenant's data
+const totalContacts = await db.select({
+  count: sql<number>`count(*)`
+})
+  .from(contacts)
+  .where(eq(contacts.tenantId, tenantId));
+```
+
+### Mistake 5: Subqueries Without Scope
+
+```typescript
+// ❌ WRONG - Subquery not scoped
+const contactsWithOpportunities = await db.select()
+  .from(contacts)
+  .where(and(
+    eq(contacts.tenantId, tenantId),
+    sql`id IN (SELECT contact_id FROM opportunities)`  // Subquery not scoped!
+  ));
+
+// ✅ CORRECT - Subquery also scoped
+const contactsWithOpportunities = await db.select()
+  .from(contacts)
+  .where(and(
+    eq(contacts.tenantId, tenantId),
+    sql`id IN (
+      SELECT contact_id FROM opportunities
+      WHERE tenant_id = ${tenantId}
+    )`
+  ));
+```
+
+## Testing Tenant Isolation
+
+### Unit Tests
+
+Always test tenant isolation in your unit tests:
+
+```typescript
+// tests/tenant-isolation.test.ts
+import { describe, it, expect, beforeEach } from 'vitest';
+import { db } from '../server/db';
+import { contacts } from '../shared/schema';
+
+describe('Tenant Isolation', () => {
+  let tenantA: string;
+  let tenantB: string;
+
+  beforeEach(async () => {
+    tenantA = crypto.randomUUID();
+    tenantB = crypto.randomUUID();
+
+    // Create test contacts for both tenants
+    await db.insert(contacts).values([
+      {
+        id: crypto.randomUUID(),
+        tenantId: tenantA,
+        firstName: 'Alice',
+        email: 'alice@tenanta.com'
+      },
+      {
+        id: crypto.randomUUID(),
+        tenantId: tenantB,
+        firstName: 'Bob',
+        email: 'bob@tenantb.com'
+      },
+    ]);
+  });
+
+  it('should only return tenant A contacts when querying as tenant A', async () => {
+    const results = await db.select()
+      .from(contacts)
+      .where(eq(contacts.tenantId, tenantA));
+
+    expect(results).toHaveLength(1);
+    expect(results[0].firstName).toBe('Alice');
+    expect(results[0].tenantId).toBe(tenantA);
+  });
+
+  it('should not allow tenant A to update tenant B data', async () => {
+    // Try to get tenant B contact as tenant A
+    const [bobContact] = await db.select()
+      .from(contacts)
+      .where(and(
+        eq(contacts.tenantId, tenantB),
+        eq(contacts.email, 'bob@tenantb.com')
+      ));
+
+    // Attempt update with wrong tenant scope
+    const updated = await db.update(contacts)
+      .set({ firstName: 'Hacked' })
+      .where(and(
+        eq(contacts.tenantId, tenantA),  // Tenant A scope
+        eq(contacts.id, bobContact.id)   // But Bob's ID
+      ))
+      .returning();
+
+    // Update should fail (no rows affected)
+    expect(updated).toHaveLength(0);
+
+    // Verify Bob's data unchanged
+    const [verifyBob] = await db.select()
+      .from(contacts)
+      .where(eq(contacts.id, bobContact.id));
+
+    expect(verifyBob.firstName).toBe('Bob');
+  });
+});
+```
+
+### Integration Tests
+
+Test API endpoints with multiple tenants:
+
+```typescript
+// tests/api/contacts.integration.test.ts
+describe('GET /api/contacts', () => {
+  it('should only return contacts for authenticated tenant', async () => {
+    // Create contacts for multiple tenants
+    await createTestContact({ tenantId: 'tenant-a', email: 'a@test.com' });
+    await createTestContact({ tenantId: 'tenant-b', email: 'b@test.com' });
+
+    // Login as tenant A
+    const sessionA = await loginAsTenant('tenant-a');
+
+    // Request contacts
+    const response = await fetch('/api/contacts', {
+      headers: { Cookie: sessionA.cookie }
+    });
+
+    const data = await response.json();
+
+    // Should only see tenant A's contacts
+    expect(data.data).toHaveLength(1);
+    expect(data.data[0].email).toBe('a@test.com');
+  });
+});
+```
+
+### Manual Testing Checklist
+
+When testing tenant isolation manually:
+
+1. ✅ Create test data for 2+ tenants
+2. ✅ Login as Tenant A
+3. ✅ Verify you only see Tenant A data
+4. ✅ Try to access Tenant B data by ID (should fail)
+5. ✅ Login as Tenant B
+6. ✅ Verify you only see Tenant B data
+7. ✅ Repeat for each entity type (contacts, opportunities, cases, etc.)
+
+## Security Vulnerabilities
+
+### SQL Injection via Missing Tenant Filter
+
+If you build raw SQL without tenant filters, SQL injection can expose all tenants:
+
+```typescript
+// ❌ EXTREMELY DANGEROUS - SQL injection + missing tenant scope
+app.get('/api/contacts/search', async (req, res) => {
+  const { query } = req.query;
+
+  // Vulnerable to SQL injection AND cross-tenant data access
+  const results = await db.execute(sql`
+    SELECT * FROM contacts
+    WHERE first_name LIKE '%${query}%'
+  `);  // NO TENANT FILTER!
+
+  res.json({ success: true, data: results });
+});
+
+// ✅ CORRECT - Parameterized query with tenant scope
+app.get('/api/contacts/search', async (req, res) => {
+  const { query } = req.query as { query: string };
+
+  const results = await db.select()
+    .from(contacts)
+    .where(and(
+      eq(contacts.tenantId, req.tenantId),           // Tenant scoped
+      sql`first_name ILIKE ${`%${query}%`}`          // Parameterized
+    ));
+
+  res.json({ success: true, data: results });
+});
+```
+
+### Authorization Bypass via ID Guessing
+
+Without tenant scoping, attackers can guess IDs:
+
+```typescript
+// ❌ VULNERABLE - Attacker can guess UUIDs
+app.get('/api/contacts/:id', async (req, res) => {
+  const contact = await db.select()
+    .from(contacts)
+    .where(eq(contacts.id, req.params.id));  // Missing tenant check!
+
+  // Attacker from Tenant A can access Tenant B's contact by guessing ID
+  res.json({ success: true, data: contact[0] });
+});
+
+// ✅ SECURE - Tenant scope prevents access
+app.get('/api/contacts/:id', async (req, res) => {
+  const contact = await db.select()
+    .from(contacts)
+    .where(and(
+      eq(contacts.tenantId, req.tenantId),    // Verify ownership
+      eq(contacts.id, req.params.id)
+    ));
+
+  if (!contact[0]) {
+    return res.status(404).json({
+      success: false,
+      error: 'Contact not found'
+    });
+  }
+
+  res.json({ success: true, data: contact[0] });
+});
+```
+
+### Mass Assignment Vulnerabilities
+
+Accepting `tenantId` from request bodies:
+
+```typescript
+// ❌ DANGEROUS - Attacker can create data in any tenant
+app.post('/api/contacts', async (req, res) => {
+  // Directly using request body
+  const contact = await db.insert(contacts).values(req.body).returning();
+
+  // If req.body includes { tenantId: 'other-tenant' }, data created in wrong tenant!
+  res.json({ success: true, data: contact[0] });
+});
+
+// ✅ SECURE - Explicitly set tenantId from session
+app.post('/api/contacts', async (req, res) => {
+  const { firstName, lastName, email, phone } = req.body;
+
+  // Only allow specific fields, inject tenantId from auth
+  const contact = await db.insert(contacts).values({
+    id: crypto.randomUUID(),
+    tenantId: req.tenantId,  // From authenticated session
+    firstName,
+    lastName,
+    email,
+    phone,
+  }).returning();
+
+  res.json({ success: true, data: contact[0] });
+});
+```
+
+## Code Review Checklist
+
+Use this checklist when reviewing database queries:
+
+### For Every Query:
+- [ ] Does it filter by `tenantId`?
+- [ ] Is `tenantId` from authenticated session (not request body/params)?
+- [ ] Are JOINed tables also filtered by `tenantId`?
+- [ ] Are subqueries scoped to `tenantId`?
+- [ ] Are OR conditions wrapped with AND for tenant scope?
+- [ ] Does the test verify tenant isolation?
+
+### For INSERT Operations:
+- [ ] Is `tenantId` explicitly set?
+- [ ] Is `tenantId` from `req.tenantId` (not client input)?
+- [ ] Are foreign key references in the same tenant?
+
+### For UPDATE/DELETE Operations:
+- [ ] Is `WHERE` clause scoped by `tenantId` AND id?
+- [ ] Cannot update/delete data from other tenants?
+
+### For Aggregations:
+- [ ] Are COUNT/SUM/AVG queries filtered by `tenantId`?
+- [ ] Do GROUP BY queries include `tenantId` in WHERE?
+
+### Security Questions:
+- [ ] Can an attacker guess IDs to access other tenants' data?
+- [ ] Can client input override `tenantId`?
+- [ ] Are raw SQL queries parameterized AND scoped?
+
+## Related Documentation
+
+<CardGroup cols={2}>
+  <Card
+    title="Multi-Tenant Architecture"
+    icon="sitemap"
+    href="/multi-tenant-architecture"
+  >
+    Understanding Juryo's tenant isolation model
+  </Card>
+  <Card
+    title="Database Setup"
+    icon="database"
+    href="/developers/database-setup"
+  >
+    Database schema and migrations
+  </Card>
+  <Card
+    title="Database Schema"
+    icon="table"
+    href="/developers/architecture/database-schema"
+  >
+    Complete table reference with relationships
+  </Card>
+  <Card
+    title="Security Best Practices"
+    icon="shield-check"
+    href="/developers/best-practices/security"
+  >
+    Additional security guidelines
+  </Card>
+</CardGroup>
+
+## Summary
+
+**The Golden Rules of Tenant Scoping:**
+
+1. **Always filter by `tenantId`** - No exceptions for tenant-scoped tables
+2. **Use `req.tenantId` from session** - Never trust client-provided tenant IDs
+3. **Scope ALL tables in JOINs** - Both sides of the relationship
+4. **Test tenant isolation** - In unit tests and integration tests
+5. **Review every query** - Use the code review checklist
+
+<Warning>
+**Missing tenant filters = Data breach**
+
+Tenant scoping violations are the #1 cause of data leaks in multi-tenant applications. Always include tenant filters in your queries.
+</Warning>
+
+When in doubt, ask: "Could this query return data from a different tenant?" If the answer is yes, add tenant scoping.

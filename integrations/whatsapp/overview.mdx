@@ -1,0 +1,286 @@
+---
+title: "WhatsApp Integration Overview"
+description: "Two-way WhatsApp messaging for client communication"
+---
+
+## Overview
+
+Juryo integrates with WhatsApp Business API to enable seamless two-way messaging with clients. All WhatsApp conversations are automatically captured, linked to contacts, and displayed in a unified inbox.
+
+<Info>
+**Key Capabilities**
+- Two-way messaging directly in Juryo
+- Automatic contact creation from new conversations
+- 24-hour messaging window compliance
+- Conversation threading and history
+- Message analytics and engagement tracking
+- Team member assignment
+</Info>
+
+## How It Works
+
+### Message Flow
+
+```
+Client sends WhatsApp → WhatsApp Business API → Webhook → Juryo
+                                                    ↓
+                                          Contact Created/Found
+                                                    ↓
+                                          Message Stored & Displayed
+                                                    ↓
+Attorney replies in Juryo → WhatsApp API → Client receives message
+```
+
+### Automatic Contact Creation
+
+When someone messages your WhatsApp Business number:
+
+1. **Webhook received** from WhatsApp API
+2. **System searches** for existing contact by phone number
+3. **If not found**, creates new contact with:
+   - Name: From WhatsApp profile (if available)
+   - Phone: Sender's number
+   - Source: "whatsapp"
+4. **Message linked** to contact's communication history
+5. **Appears in WhatsApp Inbox** for team to respond
+
+### Conversation Threading
+
+All messages between a contact and your firm are grouped into conversations:
+
+- **Conversation ID**: Unique per phone number
+- **Message History**: Complete thread visible in inbox
+- **Timestamps**: All messages timestamped
+- **Direction**: Inbound (from client) or Outbound (from team)
+
+## Features
+
+### WhatsApp Inbox
+
+Real-time inbox for all WhatsApp conversations:
+
+**Conversation List:**
+- Contact name and phone number
+- Last message preview
+- Unread message count
+- Last message timestamp
+- Assigned team member
+
+**Message Thread:**
+- Full conversation history
+- Message bubbles (inbound/outbound styling)
+- Delivery status indicators
+- Timestamp for each message
+- Contact profile sidebar
+
+### 24-Hour Messaging Window
+
+WhatsApp enforces a 24-hour window for free-form messages:
+
+**Within 24 Hours:**
+- Send any message freely
+- No restrictions on content
+
+**After 24 Hours:**
+- Must use approved message templates
+- Template selector appears in UI
+- Limited to pre-approved formats
+
+**Juryo Handles This:**
+- Automatically detects 24-hour window expiry
+- Shows template selector when outside window
+- Prevents sending free-form messages that will fail
+
+### Message Templates
+
+Pre-approved message formats for use outside the 24-hour window:
+
+**Template Components:**
+- Header (optional)
+- Body (required, with variable placeholders)
+- Footer (optional)
+- Buttons (optional)
+
+**Example Template:**
+```
+Name: appointment_reminder
+Body: "Hi {{1}}, this is a reminder about your consultation on {{2}} at {{3}}. Reply CONFIRM to confirm."
+Variables: [name, date, time]
+```
+
+**In Juryo:**
+1. Select template from dropdown
+2. Fill in variable values
+3. Preview message
+4. Send
+
+### Team Assignment
+
+Assign conversations to specific team members:
+
+**Benefits:**
+- Clear ownership of client conversations
+- Filtered inbox views (My Conversations)
+- Notification routing
+- Workload distribution
+
+**Assignment Methods:**
+- Manual assignment
+- Auto-assignment rules
+- Round-robin distribution
+- Expertise-based routing
+
+## Integration Requirements
+
+### WhatsApp Business API Account
+
+**Required:**
+- Meta Business Suite account
+- WhatsApp Business API access (not WhatsApp Business App)
+- Verified business
+- Phone number dedicated to API
+
+**Setup Steps:**
+1. Apply for WhatsApp Business API access
+2. Verify business with Meta
+3. Get phone number approved
+4. Generate access token
+5. Configure webhook URL
+
+See [WhatsApp Setup Guide](/integrations/whatsapp/setup) for detailed instructions.
+
+### Webhook Configuration
+
+Juryo needs to receive webhooks from WhatsApp:
+
+**Webhook URL:**
+```
+https://your-tenant.juryo.ai/api/webhook/whatsapp
+```
+
+**Webhook Events:**
+- `messages` - Incoming messages
+- `message_status` - Delivery/read receipts
+- `message_reaction` - Message reactions (emoji)
+
+**Verification:**
+WhatsApp will send verification request to confirm webhook ownership.
+
+See [WhatsApp Webhook Configuration](/integrations/whatsapp/webhook) for setup.
+
+## Message Analytics
+
+Track WhatsApp engagement and performance:
+
+### Conversation Metrics
+
+- **Total Conversations**: Active conversation count
+- **Messages Sent**: Outbound message volume
+- **Messages Received**: Inbound message volume
+- **Response Time**: Average time to first reply
+- **Resolution Time**: Time to conversation closure
+
+### Engagement Analysis
+
+- **Active Conversations**: Conversations with activity in last 24 hours
+- **Message Frequency**: Messages per conversation
+- **Peak Hours**: Busiest times for incoming messages
+- **Template Usage**: Most-used message templates
+
+### Team Performance
+
+- **Conversations per Team Member**: Assignment distribution
+- **Response Times by Attorney**: Individual performance
+- **Messages Sent per Team Member**: Activity levels
+
+Access analytics via:
+- WhatsApp Inbox → Analytics tab
+- Dashboard analytics widget
+- [WhatsApp Analytics API](/api-reference/analytics/whatsapp-analytics)
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Respond promptly within 24-hour window">
+    **Why:** Free-form responses only available for 24 hours. After that, limited to templates.
+
+    **How:** Set up notifications for new WhatsApp messages. Aim to respond within a few hours.
+  </Accordion>
+
+  <Accordion title="Use professional, concise language">
+    **Why:** WhatsApp is informal but still represents your firm.
+
+    **How:** Be friendly but professional. Use proper grammar. Keep messages concise.
+  </Accordion>
+
+  <Accordion title="Create templates for common scenarios">
+    **Why:** Templates allow communication outside 24-hour window.
+
+    **Common Templates:**
+    - Appointment reminders
+    - Document requests
+    - Status updates
+    - Follow-up messages
+  </Accordion>
+
+  <Accordion title="Assign conversations to appropriate team members">
+    **Why:** Ensures client gets help from the right person. Prevents duplicate responses.
+
+    **How:** Auto-assign based on legal area or round-robin. Manually reassign as needed.
+  </Accordion>
+
+  <Accordion title="Link conversations to opportunities/cases">
+    **Why:** Provides context for team members. Tracks conversation outcome.
+
+    **How:** Conversations auto-link to contacts. Manually link to specific opportunities or cases if needed.
+  </Accordion>
+</AccordionGroup>
+
+## Limitations & Considerations
+
+### WhatsApp Business API Restrictions
+
+- **Phone Number**: Must be dedicated to API (can't use same number for WhatsApp Business App)
+- **Templates**: Require Meta approval (can take 24-48 hours)
+- **Pricing**: WhatsApp charges per conversation (free tier available)
+- **24-Hour Window**: Strict enforcement of messaging window rules
+
+### Juryo Implementation
+
+- **No Multimedia (Yet)**: Current implementation is text-only. Images/files coming soon.
+- **Template Management**: Templates managed in Meta Business Suite, not Juryo
+- **Message Deletion**: Cannot delete sent messages (WhatsApp limitation)
+- **Group Chats**: Not supported. One-on-one conversations only.
+
+## Related Documentation
+
+<CardGroup cols={2}>
+  <Card
+    title="WhatsApp Setup Guide"
+    icon="gear"
+    href="/integrations/whatsapp/setup"
+  >
+    Step-by-step configuration instructions
+  </Card>
+  <Card
+    title="WhatsApp Webhook Configuration"
+    icon="webhook"
+    href="/integrations/whatsapp/webhook"
+  >
+    Configure WhatsApp webhooks to Juryo
+  </Card>
+  <Card
+    title="Communications Feature"
+    icon="messages"
+    href="/features/communications"
+  >
+    Overview of all communication channels
+  </Card>
+  <Card
+    title="WhatsApp Analytics API"
+    icon="chart-line"
+    href="/api-reference/analytics/whatsapp-analytics"
+  >
+    Retrieve WhatsApp metrics programmatically
+  </Card>
+</CardGroup>

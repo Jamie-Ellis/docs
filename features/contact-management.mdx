@@ -1,0 +1,633 @@
+---
+title: "Contact Management"
+description: "Unified contact lifecycle management from lead to client and beyond"
+---
+
+## Overview
+
+Juryo's contact management system provides a unified approach to tracking people throughout their entire relationship with your law firm. Instead of maintaining separate "leads" and "clients" databases, Juryo uses a single **Contact** entity that evolves through lifecycle stages.
+
+<Info>
+**Key Benefits**
+- Single source of truth for all contact information
+- Complete interaction history in one place
+- Seamless transition from lead to client
+- Automatic contact creation from WhatsApp and voice calls
+</Info>
+
+## Contact Lifecycle
+
+Contacts progress through five distinct stages as their relationship with your firm develops.
+
+### Stage Definitions
+
+| Stage | Description | Typical Activities |
+|-------|-------------|-------------------|
+| **Lead** | Initial contact, not yet qualified | First inquiry, form submission, cold outreach |
+| **Prospect** | Qualified and showing interest | Initial consultation scheduled, budget discussed |
+| **Qualified Lead** | Ready for formal engagement | Proposal sent, service agreement in review |
+| **Client** | Actively working with your firm | Case in progress, regular communication |
+| **Former Client** | Past client relationship | Case completed, relationship concluded |
+
+### Stage Progression
+
+Contacts typically move forward through stages, but can also move backward:
+
+```
+Lead → Prospect → Qualified Lead → Client → Former Client
+  ↑        ↓           ↓            ↓
+  └────────┴───────────┴────────────┘
+    (Can move backward if circumstances change)
+```
+
+**Automatic Stage Progression:**
+- Converting an opportunity to a case automatically updates contact to "Client"
+- Closing a case can optionally update contact to "Former Client"
+- Communication analysis can trigger stage advancement
+
+**Manual Stage Management:**
+- Lawyers can manually update contact stages at any time
+- Stage changes are logged in the activity history
+- Automation rules can trigger actions on stage changes
+
+## Contact Fields & Data
+
+### Core Information
+
+**Basic Details:**
+- First Name and Last Name (required)
+- Email address
+- Phone number (with country code)
+- Physical address
+- Notes/description
+
+**Lifecycle Tracking:**
+- Current role (lead, prospect, qualified_lead, client, former_client)
+- Acquisition source (website, referral, whatsapp, retell_call, other)
+- Acquisition channel (specific campaign or medium)
+- First contact date
+- Last contact date
+
+**External Integration:**
+- External ID (for syncing with CRM or other systems)
+- Unique constraint per tenant: `(tenantId, externalID)`
+
+### Role History
+
+Juryo maintains a complete history of role changes in the `contact_roles` table:
+
+```typescript
+{
+  contactId: "uuid",
+  role: "client",
+  startDate: "2025-01-01",
+  endDate: null,  // null = current role
+  isActive: true,
+  notes: "Converted from qualified lead after signing agreement"
+}
+```
+
+**Use Cases:**
+- Track how long contacts spend in each stage
+- Analyze conversion patterns
+- Generate reports on lifecycle progression
+- Audit trail for compliance
+
+## Creating Contacts
+
+### Manual Creation
+
+#### Via Web Interface
+
+1. Navigate to **Clients** page
+2. Click **New Contact** button
+3. Fill in required fields:
+   - Name
+   - Email or Phone (at least one required)
+   - Source (how they found you)
+4. Optional fields:
+   - Address
+   - Channel details
+   - Initial notes
+5. Click **Create Contact**
+
+#### Via API
+
+```javascript
+const response = await fetch('/api/contacts', {
+  method: 'POST',
+  credentials: 'include',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    firstName: "Maria",
+    lastName: "Garcia",
+    email: "maria.garcia@example.com",
+    phone: "+1234567890",
+    acquisitionSource: "website",
+    acquisitionChannel: "contact-form",
+    notes: "Interested in H-1B visa services"
+  })
+});
+
+const { data } = await response.json();
+console.log('Contact created:', data.id);
+```
+
+See [Create Contact API](/api-reference/contacts/create-contact) for full documentation.
+
+### Automatic Contact Creation
+
+Contacts are automatically created from multiple channels:
+
+#### 1. WhatsApp Messages
+
+When someone messages your WhatsApp Business number:
+- System checks if contact exists by phone number
+- If not found, creates new contact with source "whatsapp"
+- Links message to contact's communication history
+- Contact appears in Clients list immediately
+
+**Configuration:**
+- Requires WhatsApp Business API integration
+- Phone number mapping to tenant
+- See [WhatsApp Setup](/integrations/whatsapp/setup)
+
+#### 2. Retell AI Voice Calls
+
+When Retell AI receives a call:
+- Voice agent collects caller information
+- System searches for existing contact by phone
+- Creates contact if not found, with source "retell_call"
+- Attaches call transcript and analysis
+- Can automatically create opportunity based on conversation
+
+**Configuration:**
+- Requires Retell AI agent mapping to tenant
+- Voice agent configured to collect contact info
+- See [Voice Integration](/integrations/voice/overview)
+
+#### 3. Webhook Integrations
+
+External systems can create contacts via webhook:
+
+```bash
+curl -X POST 'https://api.juryo.ai/api/webhook/contact-opportunity' \
+  -H 'x-tenant-id: your-tenant-uuid' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "contact": {
+      "firstName": "John",
+      "lastName": "Smith",
+      "email": "john@example.com",
+      "phone": "+1234567890",
+      "acquisitionSource": "website"
+    },
+    "opportunity": {
+      "title": "Immigration Consultation",
+      "serviceType": "Immigration",
+      "stage": "lead"
+    }
+  }'
+```
+
+**Use Cases:**
+- Website contact forms
+- Landing page submissions
+- CRM integrations
+- Marketing automation systems
+- Zapier workflows
+
+See [Webhook Integration](/integrations/webhooks/overview) for setup.
+
+## Contact Details View
+
+### Information Tabs
+
+When viewing a contact, information is organized into tabs:
+
+#### 1. Overview Tab
+
+**Profile Information:**
+- Name, email, phone, address
+- Current lifecycle stage
+- Acquisition details
+- Last contact date
+- Assigned team member
+
+**Quick Actions:**
+- Create opportunity
+- Create case
+- Send message (if WhatsApp connected)
+- Schedule task
+- Add note
+
+#### 2. Opportunities Tab
+
+Lists all opportunities linked to this contact:
+- Opportunity title and stage
+- Service type and legal process
+- Estimated value
+- Expected close date
+- Status (open, won, lost)
+
+**Actions:**
+- Create new opportunity
+- Open opportunity details
+- Convert won opportunities to cases
+
+#### 3. Cases Tab
+
+Shows all cases for this contact:
+- Case name and number
+- Legal area and process
+- Current status
+- Assigned attorney
+- Important dates
+
+**Actions:**
+- Create new case
+- View case details
+- Upload documents
+- Track case progress
+
+#### 4. Communications Tab
+
+Complete interaction history:
+- All calls, WhatsApp messages, emails, SMS
+- Direction (inbound/outbound)
+- Date and time
+- Notes and analysis
+- Success indicators
+
+**Filters:**
+- By communication type
+- By date range
+- By direction
+- By team member
+
+#### 5. Documents Tab
+
+Files associated with this contact:
+- Documents uploaded to any of their cases
+- Profile documents (ID, proof of address, etc.)
+- Signed agreements
+- Correspondence
+
+#### 6. Activity Tab
+
+Audit trail of all changes:
+- Contact field updates
+- Stage changes
+- Opportunity creation/updates
+- Case assignments
+- Task completions
+- System-generated events
+
+## Searching & Filtering Contacts
+
+### Search Functionality
+
+**Quick Search:**
+Search by name, email, or phone number from the Clients page.
+
+```
+Search: "maria" → Returns:
+- Maria Garcia (maria.garcia@example.com)
+- Maria Rodriguez (maria.r@example.com)
+```
+
+**API Search:**
+```javascript
+const response = await fetch('/api/contacts?search=maria', {
+  credentials: 'include'
+});
+const { data } = await response.json();
+```
+
+### Advanced Filters
+
+Filter contacts by multiple criteria:
+
+**By Lifecycle Stage:**
+- Show only Leads
+- Show only Clients
+- Show Former Clients
+- Custom stage combinations
+
+**By Acquisition Source:**
+- Website leads
+- Referral contacts
+- WhatsApp inquiries
+- Voice call leads
+
+**By Date:**
+- Created in last 30 days
+- Last contact within 7 days
+- No contact in 60+ days
+
+**By Assignment:**
+- My contacts
+- Unassigned contacts
+- Specific team member's contacts
+
+**By Opportunity Status:**
+- Contacts with open opportunities
+- Contacts with won opportunities
+- Contacts with no opportunities
+
+## Contact Assignment
+
+### Team Member Assignment
+
+Contacts can be assigned to specific team members:
+
+**Benefits:**
+- Clear ownership and accountability
+- Filtered views (see only "my contacts")
+- Automated task routing
+- Performance tracking by team member
+
+**Assignment Methods:**
+- Manual assignment during contact creation
+- Assignment via automation rules
+- Round-robin assignment for new leads
+- Assignment based on legal area expertise
+
+**Example Automation:**
+```
+Trigger: New contact created with source "whatsapp"
+Condition: Legal area is "Immigration"
+Action: Assign to attorney with least active cases in Immigration
+```
+
+## Contact Merging
+
+When duplicate contacts exist, they can be merged:
+
+### Merge Process
+
+1. Identify duplicate contacts (same email or phone)
+2. Select primary contact (data to keep)
+3. Review secondary contact data
+4. Confirm merge operation
+5. System consolidates:
+   - Keeps primary contact information
+   - Transfers all opportunities to primary
+   - Transfers all cases to primary
+   - Merges communication history
+   - Updates external references
+
+<Warning>
+**Merge is Permanent**
+
+Contact merging cannot be undone. Always review data carefully before confirming merge.
+</Warning>
+
+## Contact Analytics
+
+### Individual Contact Metrics
+
+**Engagement Score:**
+- Calculated based on communication frequency
+- Response time to your messages
+- Opportunity progression
+- Case activity
+
+**Lifecycle Metrics:**
+- Days in current stage
+- Total days in pipeline
+- Stages progressed through
+- Conversion probability (if in opportunity stage)
+
+**Communication Stats:**
+- Total interactions
+- Last contact date
+- Average response time
+- Preferred channel
+
+### Aggregate Contact Analytics
+
+**Pipeline Health:**
+- Total contacts by stage
+- Conversion rates between stages
+- Average time in each stage
+- Drop-off analysis
+
+**Acquisition Analysis:**
+- Contacts by source (website, referral, WhatsApp, etc.)
+- Conversion rate by source
+- Best-performing channels
+- ROI by acquisition method
+
+**Team Performance:**
+- Contacts per team member
+- Conversion rates by attorney
+- Response time benchmarks
+- Case load distribution
+
+## Automation with Contacts
+
+### Automation Rules
+
+Create rules that trigger on contact events:
+
+**Trigger Types:**
+- Contact created
+- Contact stage changed
+- Contact assigned
+- Days since last contact
+- Communication received
+
+**Example Rules:**
+
+**Rule 1: New Lead Follow-up**
+```
+Trigger: Contact created with role "lead"
+Action: Create task "Initial outreach call" due in 24 hours
+Assign to: Contact's assigned attorney
+```
+
+**Rule 2: Inactive Contact Re-engagement**
+```
+Trigger: No communication in last 60 days
+Condition: Contact role is "prospect" or "qualified_lead"
+Action: Send webhook to email marketing system for re-engagement campaign
+```
+
+**Rule 3: Client Onboarding**
+```
+Trigger: Contact role changes to "client"
+Action: Start onboarding flow
+  - Create task "Send welcome email"
+  - Create task "Schedule initial consultation"
+  - Send notification to admin
+```
+
+See [Automation Rules](/integrations/automation/automation-rules) for more examples.
+
+## External System Integration
+
+### CRM Sync
+
+Keep Juryo contacts in sync with external CRMs:
+
+**Using External IDs:**
+```javascript
+// Create contact with CRM reference
+await fetch('/api/contacts', {
+  method: 'POST',
+  credentials: 'include',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    firstName: "John",
+    lastName: "Doe",
+    email: "john@example.com",
+    externalID: "salesforce-12345"  // Your CRM's ID
+  })
+});
+
+// Later, query by external ID
+const response = await fetch(
+  '/api/webhook/contacts?externalID=salesforce-12345',
+  { headers: { 'x-tenant-id': 'your-tenant-id' } }
+);
+```
+
+**Benefits:**
+- Bidirectional sync with CRMs
+- Avoid duplicate records
+- Maintain single source of truth
+- Track cross-system relationships
+
+### Marketing Automation
+
+Trigger marketing campaigns based on contact activity:
+
+**Integration Options:**
+- Zapier webhook triggers
+- Direct API webhooks to marketing platforms
+- Email marketing system sync
+- SMS campaign triggers
+
+**Example Integration:**
+```
+Contact Stage: Prospect → Qualified Lead
+→ Webhook to Mailchimp
+→ Add to "Qualified Leads" segment
+→ Start drip email campaign
+```
+
+## Data Import & Export
+
+### Bulk Import
+
+Import contacts from CSV:
+
+1. Prepare CSV file with columns:
+   - firstName, lastName, email, phone
+   - acquisitionSource, acquisitionChannel
+   - notes (optional)
+
+2. Use API to import:
+```javascript
+const contacts = csvData.map(row => ({
+  firstName: row.firstName,
+  lastName: row.lastName,
+  email: row.email,
+  phone: row.phone,
+  acquisitionSource: "import",
+  externalID: row.oldSystemId  // Preserve old IDs
+}));
+
+for (const contact of contacts) {
+  await fetch('/api/contacts', {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(contact)
+  });
+}
+```
+
+### Export Contacts
+
+Export contact data for analysis or backup:
+
+```javascript
+// Get all contacts
+const response = await fetch('/api/contacts?limit=1000', {
+  credentials: 'include'
+});
+const { data } = await response.json();
+
+// Convert to CSV
+const csv = convertToCSV(data);
+downloadFile('contacts-export.csv', csv);
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Always capture acquisition source">
+    **Why:** Knowing where contacts come from helps optimize marketing spend and understand what channels work best.
+
+    **How:** Set up tracking parameters on website forms, use UTM parameters, configure source tracking in integrations.
+  </Accordion>
+
+  <Accordion title="Assign contacts immediately">
+    **Why:** Unassigned contacts often fall through the cracks. Clear ownership ensures follow-up.
+
+    **How:** Use automation rules to assign based on legal area, round-robin distribution, or workload balancing.
+  </Accordion>
+
+  <Accordion title="Keep contact information up to date">
+    **Why:** Outdated email or phone numbers lead to failed communications and lost opportunities.
+
+    **How:** Encourage team to update contact info during every interaction. Set up periodic data hygiene reviews.
+  </Accordion>
+
+  <Accordion title="Use external IDs for CRM integration">
+    **Why:** Prevents duplicate contacts when syncing with other systems. Enables bidirectional updates.
+
+    **How:** Always include externalID when creating contacts from external sources. Use unique constraint to prevent duplicates.
+  </Accordion>
+
+  <Accordion title="Log all communications">
+    **Why:** Complete communication history improves client service and provides legal documentation.
+
+    **How:** Use WhatsApp/voice integrations for automatic logging. Train team to manually log calls and emails.
+  </Accordion>
+</AccordionGroup>
+
+## Related Features
+
+<CardGroup cols={2}>
+  <Card
+    title="Opportunity Pipeline"
+    icon="chart-line"
+    href="/features/opportunity-pipeline"
+  >
+    Track potential cases through your sales funnel
+  </Card>
+  <Card
+    title="Communications"
+    icon="messages"
+    href="/features/communications"
+  >
+    WhatsApp, voice calls, and unified interaction tracking
+  </Card>
+  <Card
+    title="Contact API Reference"
+    icon="code"
+    href="/api-reference/contacts/list-contacts"
+  >
+    Complete API documentation for contact operations
+  </Card>
+  <Card
+    title="Automation Rules"
+    icon="wand-magic-sparkles"
+    href="/integrations/automation/automation-rules"
+  >
+    Automate contact workflows and follow-ups
+  </Card>
+</CardGroup>

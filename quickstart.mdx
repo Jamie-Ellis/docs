@@ -1,80 +1,296 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: "Quickstart Guide"
+description: "Get started with Juryo in 10 minutes - create your first contact, opportunity, and case"
 ---
 
-## Get started in three steps
+## Welcome to Juryo
 
-Get your documentation site running locally and make your first customization.
+This guide will walk you through the essential workflow in Juryo: from capturing a lead to managing a case. By the end, you'll understand how to use the core features of the platform.
 
-### Step 1: Set up your local environment
+<Info>
+**Prerequisites**
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
+- Active Juryo account with login credentials
+- Admin or Lawyer role (Client role has limited access)
+- Your law firm's tenant is configured
+</Info>
 
-### Step 2: Deploy your changes
+## Step 1: Log In to Your Tenant
 
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+Juryo uses domain-based routing to identify your law firm.
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
-
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 3: Go live
-
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
-
-## Next steps
-
-Now that you have your docs running, explore these key features:
-
-<CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
-</CardGroup>
+1. Navigate to your tenant's URL (e.g., `https://yourlawfirm.juryo.ai`)
+2. Click **Sign In** and authenticate via Replit Auth
+3. You'll be redirected to the Dashboard
 
 <Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
+Each law firm has its own isolated tenant with complete data separation. You can only access your firm's data.
 </Note>
+
+## Step 2: Create Your First Contact
+
+Contacts are the foundation of Juryo - they represent people in various stages of the client lifecycle.
+
+### From the Dashboard
+
+1. Navigate to **Clients** in the sidebar
+2. Click **New Contact** button
+3. Fill in the contact details:
+   - **Name**: First and last name
+   - **Email**: Contact email address
+   - **Phone**: Phone number (include country code)
+   - **Source**: How did they find you? (Website, Referral, WhatsApp, Call)
+   - **Notes**: Any additional information
+
+4. Click **Create Contact**
+
+<Tip>
+Contacts can also be created automatically from:
+- **WhatsApp messages** - When someone messages your WhatsApp Business number
+- **Voice calls** - Via Retell AI voice agent integration
+- **Webhooks** - From external systems like your website forms
+</Tip>
+
+### Contact Lifecycle Stages
+
+Contacts move through these stages:
+- **Lead** - Initial contact, not yet qualified
+- **Prospect** - Qualified and engaged
+- **Qualified Lead** - Ready for consultation
+- **Client** - Actively working with your firm
+- **Former Client** - Past client relationship
+
+## Step 3: Create an Opportunity
+
+Opportunities represent potential cases in your sales pipeline. They help you track leads from first contact to case conversion.
+
+### From a Contact's Profile
+
+1. Open the contact you just created
+2. Click **Create Opportunity**
+3. Fill in the opportunity details:
+   - **Title**: Brief description (e.g., "Work Visa Application")
+   - **Stage**: Current pipeline stage (default: "Lead")
+   - **Service Type**: Legal service category (Immigration, Business Law, etc.)
+   - **Legal Process**: Specific procedure (e.g., "H-1B Visa", "Green Card")
+   - **Estimated Value**: Expected revenue
+   - **Priority**: High, Medium, or Low
+   - **Expected Close Date**: When you expect to close the deal
+
+4. Click **Create Opportunity**
+
+### The 7-Stage Pipeline
+
+Opportunities progress through these stages:
+
+1. **Lead** - Initial inquiry
+2. **Contacted** - First touchpoint made
+3. **Qualified** - Fit confirmed
+4. **Appointment Booked** - Consultation scheduled
+5. **Proposal Sent** - Service agreement sent
+6. **Won** - Client signed, ready to convert to case
+7. **Lost** - Opportunity didn't convert
+
+<Tip>
+Use the **Opportunities** page to view your pipeline in a Kanban board. Drag and drop opportunities between stages.
+</Tip>
+
+## Step 4: Track Communication
+
+All interactions with a contact are automatically logged in the Communications tab.
+
+### Manual Communication Entry
+
+1. Open a contact or opportunity
+2. Navigate to the **Communications** tab
+3. Click **Add Communication**
+4. Select type:
+   - **Phone Call**
+   - **Email**
+   - **WhatsApp Message**
+   - **SMS**
+   - **In-Person Meeting**
+5. Add notes and details
+6. Click **Save**
+
+### Automatic Communication Tracking
+
+Communications are automatically created from:
+- **WhatsApp messages** - Two-way messaging captured
+- **Retell AI calls** - Call transcripts and analysis
+- **Webhooks** - External system events
+
+<Note>
+Communication analytics help you understand engagement patterns, response times, and conversion success rates.
+</Note>
+
+## Step 5: Convert to a Case
+
+Once an opportunity is won, convert it to a case to begin legal work.
+
+### From an Opportunity
+
+1. Open the opportunity (should be in "Won" stage)
+2. Click **Convert to Case**
+3. Fill in case details:
+   - **Case Name**: Descriptive title
+   - **Legal Area**: Practice area (Immigration, Corporate, Family, etc.)
+   - **Legal Process**: Specific procedure
+   - **Status**: Case stage (Consultation, Active, etc.)
+   - **Assigned Attorney**: Select team member
+   - **Notes**: Case overview
+
+4. Click **Create Case**
+
+The contact's role will automatically update to **Client**.
+
+## Step 6: Manage Case Documents
+
+Cases require document collection and review. Juryo includes AI-powered document validation.
+
+### Upload Documents
+
+1. Open the case you just created
+2. Navigate to **Documents** tab
+3. Click **Upload Document**
+4. Select file from your computer
+5. Choose **Document Type** (Passport, Birth Certificate, etc.)
+6. Link to specific **Case Requirement** (optional)
+7. Click **Upload**
+
+### AI Document Review
+
+For cases with specific requirements, Juryo can automatically review documents:
+
+1. Navigate to the document you uploaded
+2. Click **Request AI Review**
+3. Select the **requirement** to validate against
+4. Google Gemini AI will analyze the document and provide:
+   - **Approval/Rejection** status
+   - **Confidence score** (0-100%)
+   - **Feedback** on missing or incorrect information
+
+<Warning>
+AI document review is a tool to assist, not replace, human legal review. Always verify AI decisions.
+</Warning>
+
+## Step 7: Automate Follow-ups
+
+Juryo includes powerful automation to reduce manual work.
+
+### Set Up Automation Rules
+
+1. Navigate to **Settings** → **Automation Rules**
+2. Click **Create Rule**
+3. Configure the trigger:
+   - **Entity**: Opportunity, Payment, Contact
+   - **Trigger**: Stage change, status update, scheduled time
+4. Add conditions (optional):
+   - Only trigger if specific criteria are met
+5. Define actions:
+   - Create task
+   - Send webhook
+   - Update fields
+   - Notify team member
+
+6. Click **Save Rule**
+
+<Tip>
+**Common Automation Examples:**
+- Send Slack notification when opportunity reaches "Won" stage
+- Create follow-up task 3 days after initial contact
+- Update CRM when case status changes
+- Notify attorney when document is uploaded
+</Tip>
+
+## Step 8: View Analytics
+
+Track your firm's performance with built-in analytics.
+
+### Opportunity Funnel
+
+1. Navigate to **Opportunities** page
+2. Click **Analytics** tab
+3. View:
+   - **Conversion rates** at each pipeline stage
+   - **Average time in stage**
+   - **Win/loss ratios**
+   - **Revenue forecasting**
+
+### Communication Metrics
+
+1. Navigate to **Call Log** or **WhatsApp Inbox**
+2. Click **Analytics**
+3. View:
+   - **Success rates** by channel
+   - **Response times**
+   - **Engagement patterns**
+   - **Team performance**
+
+<Note>
+Analytics help you identify bottlenecks in your pipeline and optimize your client acquisition process.
+</Note>
+
+## Next Steps
+
+Now that you've completed the basics, explore advanced features:
+
+<CardGroup cols={2}>
+  <Card
+    title="WhatsApp Integration"
+    icon="comment"
+    href="/integrations/whatsapp/overview"
+  >
+    Set up two-way WhatsApp messaging for client communication
+  </Card>
+  <Card
+    title="Voice AI Integration"
+    icon="phone"
+    href="/integrations/voice/overview"
+  >
+    Configure Retell AI for automated call handling and lead qualification
+  </Card>
+  <Card
+    title="Webhook Integrations"
+    icon="webhook"
+    href="/integrations/webhooks/overview"
+  >
+    Connect Juryo to Zapier, CRMs, and other external systems
+  </Card>
+  <Card
+    title="API Documentation"
+    icon="code"
+    href="/api-reference/introduction"
+  >
+    Build custom integrations with the Juryo API
+  </Card>
+</CardGroup>
+
+## Common Questions
+
+<AccordionGroup>
+  <Accordion title="Can I import existing contacts from a CSV?">
+    Contact import is available via the API. See [Create Contact endpoint](/api-reference/contacts/create-contact) for bulk import scripts.
+  </Accordion>
+
+  <Accordion title="How do I invite team members?">
+    Navigate to **Settings** → **Users** → **Invite User**. Team members will receive an email invitation to join your tenant.
+  </Accordion>
+
+  <Accordion title="What if I need to customize legal processes?">
+    Admins can configure custom legal areas and processes under **Settings** → **Legal Configuration**. Create service types specific to your practice.
+  </Accordion>
+
+  <Accordion title="How does billing work for clients?">
+    Juryo includes payment plan tracking. Navigate to a case and create a payment plan with installment schedules and status tracking.
+  </Accordion>
+</AccordionGroup>
+
+## Get Help
+
+<Info>
+**Need assistance?**
+- **Email Support**: nino.caminhante@antaiventures.com
+- **Platform Tour**: See [Platform Overview](/platform-overview) for detailed feature explanations
+- **User Guides**: Role-specific guides for [Admins](/guides/admin-guide) and [Lawyers](/guides/lawyer-guide)
+</Info>

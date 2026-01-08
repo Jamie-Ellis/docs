@@ -1,0 +1,301 @@
+---
+title: "WhatsApp Setup Guide"
+description: "Configure WhatsApp Business API integration with Juryo"
+---
+
+## Prerequisites
+
+Before setting up WhatsApp integration, ensure you have:
+
+- **Meta Business Suite account** with admin access
+- **WhatsApp Business API** access (not WhatsApp Business App)
+- **Verified business** with Meta
+- **Dedicated phone number** for WhatsApp Business API
+- **Juryo admin** access to configure integrations
+
+<Warning>
+**Phone Number Requirement**
+
+The phone number used for WhatsApp Business API cannot be used with the WhatsApp mobile app or WhatsApp Business App. It must be dedicated to the API.
+</Warning>
+
+## Step 1: Apply for WhatsApp Business API
+
+1. Go to [Meta Business Suite](https://business.facebook.com/)
+2. Navigate to **WhatsApp Manager**
+3. Click **Get Started with the WhatsApp Business Platform**
+4. Complete the application form:
+   - Business information
+   - Business verification documents
+   - Phone number to use
+5. Wait for approval (typically 1-3 business days)
+
+## Step 2: Get Access Token
+
+Once approved:
+
+1. Go to **WhatsApp Manager** in Meta Business Suite
+2. Navigate to **Business Settings** → **System Users**
+3. Create a system user (or use existing)
+4. Assign **WhatsApp Business Management** permission
+5. Generate **Access Token**:
+   - Click on the system user
+   - Click **Generate New Token**
+   - Select permissions: `whatsapp_business_messaging`, `whatsapp_business_management`
+   - Set expiration to **Never** (for permanent token)
+   - Copy and save the token securely
+
+<Tip>
+Save the access token immediately. You cannot view it again after closing the dialog. Store it securely in a password manager.
+</Tip>
+
+## Step 3: Get Phone Number ID
+
+1. In **WhatsApp Manager**, go to **API Setup**
+2. Find your phone number in the list
+3. Copy the **Phone Number ID** (numeric ID, not the phone number itself)
+
+Example:
+```
+Phone Number: +1 (555) 123-4567
+Phone Number ID: 123456789012345  ← Use this
+```
+
+## Step 4: Configure Environment Variables
+
+Add WhatsApp credentials to your Juryo environment:
+
+```bash
+# .env or environment variables
+WHATSAPP_API_URL=https://graph.facebook.com/v17.0
+WHATSAPP_API_KEY=your-access-token-from-step-2
+WHATSAPP_PHONE_NUMBER_ID=your-phone-number-id-from-step-3
+```
+
+**Restart Juryo** after adding environment variables:
+
+```bash
+# Development
+npm run dev
+
+# Production
+# Restart your hosting service
+```
+
+## Step 5: Configure Webhook in Meta
+
+Juryo needs to receive messages from WhatsApp. Configure the webhook:
+
+### Get Your Webhook URL
+
+Your webhook URL format:
+```
+https://your-tenant.juryo.ai/api/webhook/whatsapp
+```
+
+Replace `your-tenant` with your actual tenant subdomain.
+
+### Set Up in Meta Business Suite
+
+1. Go to **WhatsApp Manager** → **Configuration**
+2. Find **Webhook** section
+3. Click **Edit**
+4. Enter **Callback URL**: `https://your-tenant.juryo.ai/api/webhook/whatsapp`
+5. Enter **Verify Token**: `juryo-whatsapp-verify` (default, or custom if configured)
+6. Click **Verify and Save**
+
+### Subscribe to Webhook Fields
+
+In the same webhook configuration:
+
+1. Find **Webhook Fields** section
+2. Subscribe to:
+   - ☑️ `messages` - Required for receiving messages
+   - ☑️ `message_status` - Optional (delivery/read receipts)
+   - ☑️ `message_reaction` - Optional (emoji reactions)
+3. Click **Save**
+
+<Note>
+Meta will send a verification request to your webhook URL. Juryo automatically handles this verification when properly configured.
+</Note>
+
+See [Webhook Configuration](/integrations/whatsapp/webhook) for troubleshooting.
+
+## Step 6: Test the Integration
+
+### Send Test Message
+
+From your mobile WhatsApp:
+
+1. Send a message to your WhatsApp Business number
+2. Message should appear in **Juryo WhatsApp Inbox** within seconds
+3. If contact doesn't exist, it's created automatically
+
+### Reply from Juryo
+
+1. Go to **WhatsApp Inbox** in Juryo
+2. Find the test conversation
+3. Type a reply
+4. Click **Send**
+5. Verify message received on your mobile WhatsApp
+
+### Verify Contact Creation
+
+1. Go to **Clients** page
+2. Search for the phone number you messaged from
+3. Confirm contact was created with:
+   - Name (from WhatsApp profile, if available)
+   - Phone number
+   - Source: "whatsapp"
+
+## Step 7: Create Message Templates (Optional)
+
+For messages outside the 24-hour window, create templates:
+
+### In Meta Business Suite
+
+1. Go to **WhatsApp Manager** → **Message Templates**
+2. Click **Create Template**
+3. Fill in template details:
+   - **Name**: `appointment_reminder` (lowercase, underscores only)
+   - **Category**: Choose appropriate category
+   - **Language**: Select language
+   - **Body**: Message with variables
+     ```
+     Hi {{1}}, this is a reminder about your consultation on {{2}} at {{3}}. Reply CONFIRM to confirm.
+     ```
+   - **Variables**: Name, Date, Time
+4. Click **Submit**
+5. Wait for Meta approval (24-48 hours)
+
+### Common Template Examples
+
+**Document Request:**
+```
+Name: request_documents
+Body: Hi {{1}}, we need the following documents for your {{2}} case: {{3}}. Please reply when ready to upload.
+Variables: client_name, case_type, document_list
+```
+
+**Status Update:**
+```
+Name: case_status_update
+Body: Hi {{1}}, your {{2}} case status has been updated to: {{3}}. Reply STATUS for more details.
+Variables: client_name, case_type, status
+```
+
+**Appointment Confirmation:**
+```
+Name: confirm_appointment
+Body: Your consultation is scheduled for {{1}} at {{2}}. Location: {{3}}. Reply CONFIRM to confirm or RESCHEDULE to change.
+Variables: date, time, location
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Webhook verification fails">
+    **Error:** "Webhook verification failed" in Meta Business Suite
+
+    **Solutions:**
+    1. Verify webhook URL is correct (https://your-tenant.juryo.ai/api/webhook/whatsapp)
+    2. Ensure Juryo is running and accessible from internet
+    3. Check firewall allows incoming requests
+    4. Verify verify token matches (default: `juryo-whatsapp-verify`)
+    5. Check server logs for verification request
+  </Accordion>
+
+  <Accordion title="Messages not appearing in Juryo">
+    **Problem:** Messages sent to WhatsApp number don't show in Juryo inbox
+
+    **Solutions:**
+    1. Verify webhook is subscribed to `messages` field
+    2. Check WHATSAPP_PHONE_NUMBER_ID matches the number receiving messages
+    3. Review server logs for incoming webhook requests
+    4. Test webhook with Meta's test button
+    5. Ensure database is accessible (contact creation might fail)
+  </Accordion>
+
+  <Accordion title="Cannot send messages from Juryo">
+    **Error:** "Failed to send message" when replying
+
+    **Solutions:**
+    1. Verify WHATSAPP_API_KEY is correct and not expired
+    2. Check WHATSAPP_PHONE_NUMBER_ID is correct
+    3. Ensure access token has `whatsapp_business_messaging` permission
+    4. Verify phone number is active in Meta Business Suite
+    5. Check if outside 24-hour window (must use template)
+  </Accordion>
+
+  <Accordion title="24-hour window error">
+    **Error:** "Message failed: outside 24-hour window"
+
+    **Solution:**
+    - This is expected WhatsApp behavior
+    - Use message template instead
+    - Create and approve templates in Meta Business Suite
+    - Select template from Juryo template dropdown
+  </Accordion>
+
+  <Accordion title="Access token expired">
+    **Error:** "Invalid OAuth access token"
+
+    **Solution:**
+    1. Generate new permanent access token in Meta Business Suite
+    2. Update WHATSAPP_API_KEY environment variable
+    3. Restart Juryo
+    4. Test sending a message
+  </Accordion>
+</AccordionGroup>
+
+## Security Considerations
+
+<Warning>
+**Protect Your Access Token**
+
+- Never commit access tokens to version control
+- Store in environment variables only
+- Use different tokens for development/staging/production
+- Rotate tokens if compromised
+- Set up token expiration alerts
+</Warning>
+
+### Best Practices
+
+- **Webhook Security**: Verify webhook signatures (Juryo handles this)
+- **Rate Limiting**: Monitor API usage to stay within WhatsApp limits
+- **Error Logging**: Log failed messages for debugging
+- **Backup Tokens**: Keep backup access token in secure location
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card
+    title="WhatsApp Webhook Details"
+    icon="webhook"
+    href="/integrations/whatsapp/webhook"
+  >
+    Deep dive into webhook configuration and troubleshooting
+  </Card>
+  <Card
+    title="WhatsApp Overview"
+    icon="comment"
+    href="/integrations/whatsapp/overview"
+  >
+    Learn about WhatsApp features and capabilities
+  </Card>
+  <Card
+    title="Communications Feature"
+    icon="messages"
+    href="/features/communications"
+  >
+    Overview of all communication channels in Juryo
+  </Card>
+  <Card
+    title="Environment Variables"
+    icon="key"
+    href="/developers/environment-variables"
+  >
+    Complete list of configuration options
+  </Card>
+</CardGroup>

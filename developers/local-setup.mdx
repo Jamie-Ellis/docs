@@ -1,0 +1,591 @@
+---
+title: "Local Development Setup"
+description: "Set up your development environment and run Juryo locally"
+---
+
+## Prerequisites
+
+Before you begin, ensure you have the following installed:
+
+- **Node.js 20.x LTS** - [Download](https://nodejs.org/)
+- **npm** (comes with Node.js)
+- **PostgreSQL** - Local installation or [Neon](https://neon.tech/) account (recommended)
+- **Git** - [Download](https://git-scm.com/)
+- **Code Editor** - VS Code recommended
+
+<Info>
+**Recommended Setup**
+- Node.js 20.16.11 or higher
+- PostgreSQL 14+ (or Neon serverless)
+- 8GB RAM minimum
+- macOS, Linux, or Windows with WSL2
+</Info>
+
+## Quick Start
+
+Get up and running in 5 minutes:
+
+```bash
+# Clone the repository
+git clone https://github.com/juryo/juryo-platform.git
+cd juryo-platform
+
+# Install dependencies
+npm install
+
+# Set up environment variables
+cp .env.example .env
+# Edit .env with your database and API keys
+
+# Run database migrations
+npm run db:push
+
+# Start development server
+npm run dev
+```
+
+The application will be available at `http://localhost:5000`
+
+## Detailed Setup
+
+### 1. Clone the Repository
+
+```bash
+git clone https://github.com/juryo/juryo-platform.git
+cd juryo-platform
+```
+
+### 2. Install Dependencies
+
+Install all required packages:
+
+```bash
+npm install
+```
+
+This installs:
+- **Backend**: Express.js, Drizzle ORM, TypeScript, etc.
+- **Frontend**: React 18, TanStack Query, Radix UI, Tailwind CSS
+- **Dev Tools**: Vite, tsx, esbuild, TypeScript compiler
+
+**Installation Time:** ~2-3 minutes depending on internet speed
+
+### 3. Set Up Environment Variables
+
+Create your `.env` file:
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env` with your configuration. See [Environment Variables](/developers/environment-variables) for complete documentation.
+
+**Minimum Required Variables:**
+
+```bash
+# Database (required)
+DATABASE_URL=postgresql://user:password@localhost:5432/juryo_dev
+
+# Session (required - generate random string)
+SESSION_SECRET=your-random-32-character-string-here
+
+# Replit Auth (required for login)
+REPL_ID=your-repl-id
+ISSUER_URL=https://replit.com/oidc
+```
+
+<Tip>
+**Generate Session Secret:**
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+</Tip>
+
+### 4. Set Up Database
+
+#### Option A: Local PostgreSQL
+
+If you have PostgreSQL installed locally:
+
+```bash
+# Create database
+createdb juryo_dev
+
+# Set DATABASE_URL in .env
+DATABASE_URL=postgresql://localhost:5432/juryo_dev
+
+# Run migrations
+npm run db:push
+```
+
+#### Option B: Neon Serverless (Recommended)
+
+Neon provides free PostgreSQL hosting:
+
+1. Sign up at [neon.tech](https://neon.tech/)
+2. Create a new project
+3. Copy the connection string
+4. Add to `.env`:
+
+```bash
+DATABASE_URL=postgresql://username:password@ep-xxx.us-east-2.aws.neon.tech/neondb?sslmode=require
+```
+
+5. Run migrations:
+
+```bash
+npm run db:push
+```
+
+**Migration Output:**
+```
+📦 Pushing schema to database...
+✅ Tables created successfully
+✅ Indexes created
+✅ Foreign keys established
+```
+
+See [Database Setup](/developers/database-setup) for detailed migration information.
+
+### 5. Configure Optional Integrations
+
+For full functionality, configure these services (optional for development):
+
+#### Google Cloud Storage (Document Upload)
+
+```bash
+# Create service account JSON file
+# Download from Google Cloud Console
+
+GOOGLE_APPLICATION_CREDENTIALS='{"type":"service_account",...}'
+GOOGLE_CLOUD_PROJECT_ID=your-project-id
+GOOGLE_CLOUD_STORAGE_BUCKET=juryo-dev-documents
+```
+
+**Without GCS:** File uploads will fail. Use mock data for testing.
+
+#### Google Gemini AI (Document Review)
+
+```bash
+GEMINI_API_KEY=your-api-key-here
+```
+
+Get API key from [Google AI Studio](https://makersuite.google.com/app/apikey)
+
+**Without Gemini:** AI document review features won't work.
+
+#### WhatsApp Business API
+
+```bash
+WHATSAPP_API_URL=https://graph.facebook.com/v17.0
+WHATSAPP_API_KEY=your-whatsapp-api-token
+WHATSAPP_PHONE_NUMBER_ID=your-phone-number-id
+```
+
+**Without WhatsApp:** WhatsApp integration features won't work. Use UI for manual communication entry.
+
+#### Retell AI (Voice Agent)
+
+```bash
+RETELL_API_KEY=your-retell-api-key
+```
+
+**Without Retell:** Voice integration features won't work.
+
+### 6. Start Development Server
+
+Start both backend and frontend with hot reload:
+
+```bash
+npm run dev
+```
+
+**What This Does:**
+- Starts Express server on port 5000
+- Starts Vite dev server with HMR (Hot Module Replacement)
+- Proxies API requests from frontend to backend
+- Watches for file changes and auto-restarts
+
+**Console Output:**
+```
+[server] Server running on http://localhost:5000
+[client] VITE v5.4.19 ready in 324 ms
+[client] ➜ Local: http://localhost:5173/
+[client] ➜ Network: use --host to expose
+```
+
+<Note>
+Frontend runs on port 5173, but proxies API calls to port 5000. Always access the app at `http://localhost:5173` during development.
+</Note>
+
+### 7. Verify Installation
+
+Open `http://localhost:5173` in your browser. You should see:
+
+1. **Landing Page** - If not logged in
+2. **Login Button** - Click to authenticate
+3. **Replit Auth** - OAuth flow (if configured)
+4. **Dashboard** - After successful login
+
+**Health Check:**
+```bash
+curl http://localhost:5000/health
+# Should return: {"status":"ok"}
+```
+
+## Development Workflow
+
+### File Structure
+
+```
+juryo-platform/
+├── server/              # Backend Express.js app
+│   ├── index.ts         # Main entry point
+│   ├── routes.ts        # API route definitions (6,694 lines)
+│   ├── storage.ts       # Database layer (5,083 lines)
+│   ├── flow-engine.ts   # Automation workflows
+│   └── ...
+├── client/              # Frontend React app
+│   ├── src/
+│   │   ├── pages/       # Route components (23 pages)
+│   │   ├── components/  # Reusable UI components
+│   │   ├── hooks/       # Custom React hooks
+│   │   └── lib/         # Utilities
+│   └── ...
+├── shared/              # Shared code
+│   └── schema.ts        # Drizzle ORM schema (database tables)
+├── docs/                # Mintlify documentation
+└── package.json         # Dependencies and scripts
+```
+
+### Making Changes
+
+#### Backend Changes
+
+Edit files in `server/`:
+
+```typescript
+// server/routes.ts
+app.get('/api/contacts', async (req, res) => {
+  // Your changes here
+  // Server auto-restarts on save
+});
+```
+
+**Auto-restart:** tsx watches for changes and restarts the server automatically.
+
+#### Frontend Changes
+
+Edit files in `client/src/`:
+
+```typescript
+// client/src/pages/Clients.tsx
+export default function Clients() {
+  // Your changes here
+  // Browser auto-refreshes on save (HMR)
+}
+```
+
+**Hot Module Replacement:** Vite updates the browser without full refresh, preserving state.
+
+#### Database Schema Changes
+
+Edit `shared/schema.ts`:
+
+```typescript
+// shared/schema.ts
+export const contacts = pgTable('contacts', {
+  id: varchar('id').primaryKey(),
+  tenantId: varchar('tenant_id').notNull(),
+  firstName: varchar('first_name'),
+  // Add new field
+  middleName: varchar('middle_name'), // New field
+});
+```
+
+Apply changes:
+
+```bash
+npm run db:push
+```
+
+<Warning>
+**Schema Changes Warning**
+
+`db:push` will attempt to alter tables. If conflicts occur, you may need `npm run db:push --force` which can be destructive. Always backup production data before force pushing.
+</Warning>
+
+### Running Tests
+
+```bash
+# Run all tests (when tests are added)
+npm test
+
+# Type check
+npm run check
+
+# Lint code
+npm run lint
+```
+
+Currently, the project uses TypeScript for compile-time type checking.
+
+### Building for Production
+
+Build optimized bundles:
+
+```bash
+npm run build
+```
+
+**Output:**
+- `dist/` - Backend bundle (esbuild)
+- `dist/public/` - Frontend bundle (Vite)
+
+Start production server:
+
+```bash
+npm start
+```
+
+## Common Development Tasks
+
+### Creating a New API Endpoint
+
+1. **Add route in `server/routes.ts`:**
+
+```typescript
+app.get('/api/my-endpoint', async (req, res) => {
+  const tenantId = req.user?.tenantId; // Always scope by tenant
+
+  try {
+    const data = await storage.getMyData(tenantId);
+    res.json({ success: true, data });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+```
+
+2. **Add storage method in `server/storage.ts`:**
+
+```typescript
+async getMyData(tenantId: string) {
+  return await db.select()
+    .from(myTable)
+    .where(eq(myTable.tenantId, tenantId)); // ALWAYS filter by tenant
+}
+```
+
+3. **Call from frontend:**
+
+```typescript
+// client/src/pages/MyPage.tsx
+import { useQuery } from '@tanstack/react-query';
+
+const { data } = useQuery({
+  queryKey: ['my-data'],
+  queryFn: async () => {
+    const res = await fetch('/api/my-endpoint', {
+      credentials: 'include'
+    });
+    return res.json();
+  }
+});
+```
+
+### Adding a New Database Table
+
+1. **Define schema in `shared/schema.ts`:**
+
+```typescript
+export const myNewTable = pgTable('my_new_table', {
+  id: varchar('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+  tenantId: varchar('tenant_id').notNull().references(() => tenants.id),
+  name: varchar('name').notNull(),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+```
+
+2. **Push to database:**
+
+```bash
+npm run db:push
+```
+
+3. **Use in storage layer:**
+
+```typescript
+// server/storage.ts
+async createMyEntity(tenantId: string, data: any) {
+  const [entity] = await db.insert(myNewTable)
+    .values({ tenantId, ...data })
+    .returning();
+  return entity;
+}
+```
+
+### Adding a New React Page
+
+1. **Create page component:**
+
+```typescript
+// client/src/pages/MyNewPage.tsx
+export default function MyNewPage() {
+  return (
+    <div>
+      <h1>My New Page</h1>
+    </div>
+  );
+}
+```
+
+2. **Add route in `client/src/App.tsx`:**
+
+```typescript
+import MyNewPage from './pages/MyNewPage';
+
+// In route list:
+<Route path="/my-new-page" component={MyNewPage} />
+```
+
+3. **Add to navigation (optional):**
+
+```typescript
+// client/src/components/layout/Sidebar.tsx
+<NavLink href="/my-new-page">My New Page</NavLink>
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Port 5000 already in use">
+    **Error:** `EADDRINUSE: address already in use :::5000`
+
+    **Solution:** Kill the process using port 5000
+    ```bash
+    # macOS/Linux
+    lsof -ti:5000 | xargs kill -9
+
+    # Windows
+    netstat -ano | findstr :5000
+    taskkill /PID <PID> /F
+    ```
+  </Accordion>
+
+  <Accordion title="Database connection failed">
+    **Error:** `ECONNREFUSED` or `connection refused`
+
+    **Solution:**
+    1. Verify DATABASE_URL is correct
+    2. Ensure PostgreSQL is running (if local)
+    3. Check firewall settings
+    4. For Neon, verify connection string includes `?sslmode=require`
+  </Accordion>
+
+  <Accordion title="npm install fails">
+    **Error:** Various installation errors
+
+    **Solution:**
+    1. Clear npm cache: `npm cache clean --force`
+    2. Delete node_modules: `rm -rf node_modules`
+    3. Delete package-lock.json: `rm package-lock.json`
+    4. Reinstall: `npm install`
+    5. Ensure Node.js version is 20.x: `node --version`
+  </Accordion>
+
+  <Accordion title="TypeScript errors after schema change">
+    **Error:** Type errors in IDE or build
+
+    **Solution:**
+    1. Restart TypeScript server in VS Code (Cmd+Shift+P → "Restart TS Server")
+    2. Rebuild: `npm run check`
+    3. Ensure `shared/schema.ts` exports are correct
+  </Accordion>
+
+  <Accordion title="Hot reload not working">
+    **Problem:** Changes don't reflect in browser
+
+    **Solution:**
+    1. Check browser console for errors
+    2. Restart dev server: Ctrl+C, then `npm run dev`
+    3. Clear browser cache: Hard refresh (Cmd+Shift+R or Ctrl+Shift+R)
+    4. Check if Vite proxy is configured correctly
+  </Accordion>
+
+  <Accordion title="Authentication fails locally">
+    **Error:** Replit Auth redirect fails
+
+    **Solution:**
+    1. Verify REPL_ID is set correctly
+    2. Check ISSUER_URL is `https://replit.com/oidc`
+    3. Ensure SESSION_SECRET is set
+    4. For local dev, you may need to mock authentication
+  </Accordion>
+</AccordionGroup>
+
+## IDE Configuration
+
+### VS Code (Recommended)
+
+**Recommended Extensions:**
+- ESLint
+- Prettier
+- TypeScript and JavaScript Language Features
+- Tailwind CSS IntelliSense
+- PostCSS Language Support
+- Database Client (for PostgreSQL)
+
+**Settings (`settings.json`):**
+```json
+{
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "tailwindCSS.experimental.classRegex": [
+    ["cva\\(([^)]*)\\)", "[\"'`]([^\"'`]*).*?[\"'`]"]
+  ]
+}
+```
+
+### Database Client
+
+Use [TablePlus](https://tableplus.com/), [DBeaver](https://dbeaver.io/), or VS Code extension to connect to your database.
+
+**Connection String:** Same as DATABASE_URL in `.env`
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Environment Variables"
+    icon="key"
+    href="/developers/environment-variables"
+  >
+    Complete list of configuration options
+  </Card>
+  <Card
+    title="Database Setup"
+    icon="database"
+    href="/developers/database-setup"
+  >
+    Schema migrations and database management
+  </Card>
+  <Card
+    title="Architecture Overview"
+    icon="diagram-project"
+    href="/developers/architecture/tech-stack"
+  >
+    Understanding the technology stack
+  </Card>
+  <Card
+    title="Best Practices"
+    icon="shield-check"
+    href="/developers/best-practices/tenant-scoping"
+  >
+    Security and coding guidelines
+  </Card>
+</CardGroup>

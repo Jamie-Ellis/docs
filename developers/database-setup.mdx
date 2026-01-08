@@ -1,0 +1,465 @@
+---
+title: "Database Setup & Migrations"
+description: "Managing database schema, migrations, and data"
+---
+
+## Overview
+
+Juryo uses PostgreSQL with Drizzle ORM for type-safe database operations. The schema is defined in TypeScript and migrations are applied using Drizzle Kit.
+
+<Info>
+**Database Stack**
+- **Database**: PostgreSQL 14+
+- **ORM**: Drizzle ORM
+- **Migrations**: Drizzle Kit
+- **Schema**: TypeScript definitions in `shared/schema.ts`
+</Info>
+
+## Database Schema
+
+### Schema Definition
+
+All tables are defined in `shared/schema.ts`:
+
+```typescript
+// shared/schema.ts
+import { pgTable, varchar, timestamp } from 'drizzle-orm/pg-core';
+
+export const contacts = pgTable('contacts', {
+  id: varchar('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+  tenantId: varchar('tenant_id').notNull().references(() => tenants.id),
+  firstName: varchar('first_name'),
+  lastName: varchar('last_name'),
+  email: varchar('email'),
+  phone: varchar('phone'),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+```
+
+**Key Features:**
+- Type-safe column definitions
+- Automatic UUID generation
+- Foreign key relationships
+- Default values and timestamps
+- Tenant scoping on all relevant tables
+
+### Table Categories
+
+**Core Entities:**
+- `tenants` - Law firm accounts
+- `users` - User accounts
+- `tenant_users` - User-tenant mapping
+- `contacts` - Contacts (leads → clients)
+- `opportunities` - Sales pipeline
+- `cases` - Legal matters
+- `communications` - All interactions
+
+**Supporting Tables:**
+- `documents` - Case files metadata
+- `legal_areas` - Practice areas
+- `legal_processes` - Specific procedures
+- `tasks` - Scheduled actions
+- `automation_rules` - Workflow automation
+- `webhook_configurations` - External integrations
+
+See [Database Schema Documentation](/developers/architecture/database-schema) for complete table reference.
+
+## Initial Database Setup
+
+### Local PostgreSQL
+
+```bash
+# Create database
+createdb juryo_dev
+
+# Set DATABASE_URL
+export DATABASE_URL=postgresql://localhost:5432/juryo_dev
+
+# Apply schema
+npm run db:push
+```
+
+### Neon Serverless (Recommended)
+
+1. Sign up at [neon.tech](https://neon.tech/)
+2. Create new project
+3. Copy connection string
+4. Add to `.env`:
+
+```bash
+DATABASE_URL=postgresql://user:pass@ep-xxx.region.aws.neon.tech/neondb?sslmode=require
+```
+
+5. Apply schema:
+
+```bash
+npm run db:push
+```
+
+## Schema Migrations
+
+### Applying Changes
+
+When you modify `shared/schema.ts`, apply changes with:
+
+```bash
+npm run db:push
+```
+
+**What This Does:**
+1. Compares schema definition with database
+2. Generates SQL statements to sync
+3. Applies changes (CREATE/ALTER/DROP)
+4. Updates schema snapshot
+
+**Output:**
+```
+📦 Pushing schema to database...
+✅ Table "contacts" - columns synced
+✅ Table "opportunities" - new column "priority" added
+✅ Index created on contacts(tenant_id, email)
+✅ Foreign keys established
+```
+
+### Force Push
+
+If conflicts occur:
+
+```bash
+npm run db:push --force
+```
+
+<Warning>
+**Force Push is Destructive**
+
+`--force` may drop columns or tables if Drizzle cannot reconcile differences. **Always backup production data** before force pushing.
+</Warning>
+
+**When to Use Force:**
+- Column type changed (e.g., `integer` → `varchar`)
+- Column renamed without migration
+- Complex schema changes
+- Development database reset
+
+**Production Warning:** Never use `--force` in production without backup.
+
+### Schema Change Examples
+
+#### Adding a Column
+
+```typescript
+// shared/schema.ts
+export const contacts = pgTable('contacts', {
+  // ... existing fields
+  middleName: varchar('middle_name'), // NEW FIELD
+});
+```
+
+Apply:
+```bash
+npm run db:push
+# Output: ✅ Column "middle_name" added to "contacts"
+```
+
+#### Adding an Index
+
+```typescript
+export const contacts = pgTable('contacts', {
+  // ... fields
+}, (table) => ({
+  emailIndex: index('contacts_email_idx').on(table.email),
+}));
+```
+
+#### Adding Foreign Key
+
+```typescript
+export const opportunities = pgTable('opportunities', {
+  contactId: varchar('contact_id')
+    .notNull()
+    .references(() => contacts.id, { onDelete: 'cascade' }),
+});
+```
+
+**CASCADE Options:**
+- `onDelete: 'cascade'` - Delete opportunities when contact deleted
+- `onDelete: 'set null'` - Set to null when referenced row deleted
+- `onDelete: 'restrict'` - Prevent deletion if referenced
+
+## Database Configuration
+
+### Connection Options
+
+Drizzle connects via DATABASE_URL:
+
+```typescript
+// server/db.ts
+import { drizzle } from 'drizzle-orm/neon-http';
+import { neon } from '@neondatabase/serverless';
+
+const sql = neon(process.env.DATABASE_URL!);
+export const db = drizzle(sql);
+```
+
+**Connection Pooling:**
+Neon serverless handles connection pooling automatically. For local PostgreSQL, consider using `pg-pool`:
+
+```typescript
+import { Pool } from 'pg';
+import { drizzle } from 'drizzle-orm/node-postgres';
+
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  max: 20, // Maximum pool size
+});
+
+export const db = drizzle(pool);
+```
+
+### Performance Tuning
+
+**Indexes:**
+Critical indexes already defined in schema:
+- `(tenant_id, email)` on contacts
+- `(tenant_id, phone)` on contacts
+- `tenant_id` on all tenant-scoped tables
+
+**Query Optimization:**
+Always filter by `tenant_id` first (indexed):
+
+```typescript
+// ✅ Efficient - uses index
+await db.select()
+  .from(contacts)
+  .where(and(
+    eq(contacts.tenantId, tenantId),
+    eq(contacts.email, email)
+  ));
+
+// ❌ Inefficient - full table scan
+await db.select()
+  .from(contacts)
+  .where(eq(contacts.email, email)); // Missing tenant filter!
+```
+
+## Data Seeding
+
+### Development Seed Data
+
+Create seed script for development:
+
+```typescript
+// scripts/seed.ts
+import { db } from './server/db';
+import { tenants, users, contacts } from './shared/schema';
+
+async function seed() {
+  // Create test tenant
+  const [tenant] = await db.insert(tenants).values({
+    id: crypto.randomUUID(),
+    subdomain: 'test-firm',
+    name: 'Test Law Firm',
+  }).returning();
+
+  // Create test user
+  await db.insert(users).values({
+    id: crypto.randomUUID(),
+    email: 'admin@test.com',
+    name: 'Test Admin',
+  });
+
+  // Create test contacts
+  await db.insert(contacts).values([
+    {
+      tenantId: tenant.id,
+      firstName: 'John',
+      lastName: 'Doe',
+      email: 'john@example.com',
+    },
+    // ... more test data
+  ]);
+
+  console.log('✅ Seed data created');
+}
+
+seed().catch(console.error);
+```
+
+Run:
+```bash
+tsx scripts/seed.ts
+```
+
+## Database Backups
+
+### Local Backups
+
+```bash
+# Backup
+pg_dump juryo_dev > backup_$(date +%Y%m%d).sql
+
+# Restore
+psql juryo_dev < backup_20250108.sql
+```
+
+### Neon Backups
+
+Neon provides automatic backups:
+- **Point-in-time recovery** - Restore to any point in last 30 days
+- **Branch backups** - Create database branches for testing
+- **Manual snapshots** - Save current state before major changes
+
+**Create Branch:**
+```bash
+# Neon CLI
+neon branches create --name testing-branch
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Migration fails with 'column already exists'">
+    **Cause:** Schema out of sync with database
+
+    **Solution:**
+    1. Drop the problematic column manually
+    2. Run `npm run db:push` again
+    3. Or use `npm run db:push --force` (backup first!)
+  </Accordion>
+
+  <Accordion title="Foreign key constraint violation">
+    **Error:** `violates foreign key constraint`
+
+    **Cause:** Trying to insert/update with invalid reference
+
+    **Solution:**
+    1. Verify referenced row exists
+    2. Check tenant_id matches
+    3. Ensure proper insert order (parent before child)
+  </Accordion>
+
+  <Accordion title="Connection pool exhausted">
+    **Error:** `sorry, too many clients already`
+
+    **Cause:** Too many open connections
+
+    **Solution:**
+    1. Check for connection leaks
+    2. Reduce pool size
+    3. Use serverless database (Neon)
+    4. Implement connection retry logic
+  </Accordion>
+
+  <Accordion title="Schema push hangs or times out">
+    **Problem:** `db:push` doesn't complete
+
+    **Solution:**
+    1. Check database is accessible
+    2. Verify no long-running queries blocking
+    3. Check for table locks
+    4. Try smaller schema changes incrementally
+  </Accordion>
+
+  <Accordion title="Type errors after schema change">
+    **Problem:** TypeScript errors after modifying schema
+
+    **Solution:**
+    1. Restart TypeScript server (VS Code: Cmd+Shift+P → Restart TS Server)
+    2. Verify schema exports are correct
+    3. Rebuild: `npm run check`
+  </Accordion>
+</AccordionGroup>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Always include tenant_id in queries">
+    **Why:** Data isolation and query performance
+
+    **How:** Every query on tenant-scoped tables must filter by tenant_id
+
+    ```typescript
+    // ✅ Correct
+    where(eq(table.tenantId, tenantId))
+
+    // ❌ Wrong
+    where(eq(table.email, email)) // Missing tenant filter
+    ```
+  </Accordion>
+
+  <Accordion title="Use transactions for multi-table operations">
+    **Why:** Data consistency
+
+    **How:**
+    ```typescript
+    await db.transaction(async (tx) => {
+      await tx.insert(contacts).values(contactData);
+      await tx.insert(opportunities).values(oppData);
+    });
+    ```
+  </Accordion>
+
+  <Accordion title="Never change primary key types">
+    **Why:** Extremely difficult to migrate existing data
+
+    **What:** Once a table uses `varchar` UUIDs, keep it that way
+  </Accordion>
+
+  <Accordion title="Test migrations on copy of production data">
+    **Why:** Catch issues before production deployment
+
+    **How:**
+    1. Create database branch/copy
+    2. Restore production data
+    3. Test migration
+    4. Verify data integrity
+    5. Then apply to production
+  </Accordion>
+
+  <Accordion title="Use indexes strategically">
+    **Why:** Balance query performance vs. write performance
+
+    **Index:**
+    - Foreign keys (tenant_id, contact_id, etc.)
+    - Frequently searched columns (email, phone)
+    - Sort columns (created_at, updated_at)
+
+    **Don't Index:**
+    - Low-cardinality columns (boolean flags)
+    - Rarely queried columns
+    - Very large text fields
+  </Accordion>
+</AccordionGroup>
+
+## Related Documentation
+
+<CardGroup cols={2}>
+  <Card
+    title="Database Schema Reference"
+    icon="database"
+    href="/developers/architecture/database-schema"
+  >
+    Complete table and relationship documentation
+  </Card>
+  <Card
+    title="Environment Variables"
+    icon="key"
+    href="/developers/environment-variables"
+  >
+    Database connection configuration
+  </Card>
+  <Card
+    title="Tenant Scoping Best Practices"
+    icon="shield-check"
+    href="/developers/best-practices/tenant-scoping"
+  >
+    Critical security guidelines for queries
+  </Card>
+  <Card
+    title="Local Development Setup"
+    icon="laptop-code"
+    href="/developers/local-setup"
+  >
+    Complete development environment guide
+  </Card>
+</CardGroup>

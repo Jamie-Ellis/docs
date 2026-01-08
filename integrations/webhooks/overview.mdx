@@ -1,0 +1,431 @@
+---
+title: "Webhook System Overview"
+description: "Integrate Juryo with external systems via webhooks"
+---
+
+## Overview
+
+Juryo's webhook system enables bidirectional integration with external systems like CRMs, project management tools, and automation platforms (Zapier, Make, etc.).
+
+<Info>
+**Webhook Capabilities**
+- **Outgoing webhooks**: Notify external systems of Juryo events
+- **Incoming webhooks**: Receive data from external systems
+- **Event-based triggers**: Opportunity changes, case updates, payments
+- **Delivery tracking**: Monitor webhook success/failure
+- **Retry logic**: Automatic retry with exponential backoff
+- **HMAC signatures**: Secure webhook verification
+</Info>
+
+## Webhook Types
+
+### Outgoing Webhooks
+
+Send events from Juryo to external systems:
+
+**Common Use Cases:**
+- Update CRM when opportunity stage changes
+- Notify Slack when case is won
+- Trigger Zapier workflow on new contact
+- Send to analytics platform for reporting
+- Sync payment status to accounting software
+
+**Configuration:** Set up webhook endpoints in Juryo admin
+
+### Incoming Webhooks
+
+Receive data from external systems into Juryo:
+
+**Common Use Cases:**
+- Create contacts from website forms
+- Create opportunities from landing pages
+- Update case status from court filing systems
+- Receive payment confirmations
+- Import leads from marketing platforms
+
+**Endpoints:**
+- `POST /api/webhook/contact-opportunity` - Create contact and opportunity
+- `POST /api/webhook/whatsapp` - WhatsApp messages
+- `POST /api/webhook/retell` - Voice call analysis
+
+## Outgoing Webhooks
+
+### Configuration
+
+Create webhook configurations per tenant:
+
+1. Go to **Settings** → **Webhooks**
+2. Click **Add Webhook**
+3. Configure:
+   - **Name**: Descriptive name
+   - **URL**: Endpoint to call
+   - **Events**: Which events trigger this webhook
+   - **Headers**: Custom headers (auth tokens, etc.)
+   - **Secret**: For HMAC signature generation
+4. Click **Save**
+
+**Example Configuration:**
+```json
+{
+  "name": "Slack Notifications",
+  "url": "https://hooks.slack.com/services/xxx/yyy/zzz",
+  "events": ["opportunity.won", "case.created"],
+  "headers": {
+    "Content-Type": "application/json"
+  },
+  "active": true
+}
+```
+
+### Event Types
+
+Available webhook events:
+
+| Event | Trigger | Payload Includes |
+|-------|---------|------------------|
+| `opportunity.created` | New opportunity | Opportunity object, contact |
+| `opportunity.stage_changed` | Stage update | New/old stage, opportunity |
+| `opportunity.won` | Opportunity won | Opportunity, contact, value |
+| `opportunity.lost` | Opportunity lost | Opportunity, reason |
+| `case.created` | New case created | Case object, client |
+| `case.status_changed` | Status update | New/old status, case |
+| `case.completed` | Case closed | Case, completion details |
+| `document.uploaded` | New document | Document metadata, case |
+| `payment.received` | Payment logged | Payment details, case |
+| `contact.created` | New contact | Contact object |
+
+### Payload Format
+
+All outgoing webhooks use consistent format:
+
+```json
+{
+  "event": "opportunity.won",
+  "timestamp": "2025-01-08T18:00:00Z",
+  "tenantId": "tenant-uuid",
+  "data": {
+    "opportunity": {
+      "id": "opp-uuid",
+      "title": "H-1B Visa Application",
+      "stage": "won",
+      "value": 8000,
+      "contact": {
+        "id": "contact-uuid",
+        "firstName": "Maria",
+        "lastName": "Rodriguez",
+        "email": "maria@example.com",
+        "phone": "+15551234567"
+      }
+    },
+    "previousStage": "proposal_sent",
+    "wonDate": "2025-01-08"
+  }
+}
+```
+
+### Delivery & Retry Logic
+
+**Delivery Process:**
+1. Event triggered in Juryo
+2. Webhook payload constructed
+3. HTTP POST sent to configured URL
+4. Response logged
+
+**Success Criteria:**
+- HTTP status 200-299
+- Response within 30 seconds
+
+**Failure & Retry:**
+- Status code ≥400 or timeout = failure
+- Automatic retry schedule:
+  - Immediate retry
+  - After 1 minute
+  - After 5 minutes
+  - After 15 minutes
+  - After 1 hour
+  - Up to 5 total attempts
+
+**Delivery Log:**
+View delivery history in Juryo:
+- Webhook name and URL
+- Event type
+- Timestamp
+- Status (success/failed)
+- Response code
+- Response body
+- Retry attempts
+
+### Security - HMAC Signatures
+
+Verify webhooks are authentic using HMAC signatures:
+
+**Juryo Sends:**
+```
+X-Juryo-Signature: sha256=abc123...
+```
+
+**Your System Verifies:**
+```javascript
+const crypto = require('crypto');
+
+function verifyWebhook(payload, signature, secret) {
+  const expectedSignature = crypto
+    .createHmac('sha256', secret)
+    .update(JSON.stringify(payload))
+    .digest('hex');
+
+  return `sha256=${expectedSignature}` === signature;
+}
+
+// In webhook handler:
+const isValid = verifyWebhook(
+  req.body,
+  req.headers['x-juryo-signature'],
+  'your-webhook-secret'
+);
+
+if (!isValid) {
+  return res.status(403).json({ error: 'Invalid signature' });
+}
+```
+
+See [Webhook Security](/integrations/webhooks/security) for more details.
+
+## Incoming Webhooks
+
+### Contact & Opportunity Creation
+
+Create contacts and opportunities from external sources:
+
+**Endpoint:** `POST /api/webhook/contact-opportunity`
+
+**Authentication:** `x-tenant-id` header
+
+**Request:**
+```json
+{
+  "contact": {
+    "firstName": "John",
+    "lastName": "Smith",
+    "email": "john@example.com",
+    "phone": "+15551234567",
+    "acquisitionSource": "website"
+  },
+  "opportunity": {
+    "title": "Immigration Consultation",
+    "serviceType": "Immigration",
+    "stage": "lead",
+    "estimatedValue": 5000,
+    "priority": "high"
+  }
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "contact": {
+    "id": "contact-uuid",
+    "firstName": "John",
+    "lastName": "Smith"
+  },
+  "opportunity": {
+    "id": "opp-uuid",
+    "title": "Immigration Consultation"
+  }
+}
+```
+
+**Use Cases:**
+- Website contact forms
+- Landing page submissions
+- Live chat conversations
+- Email newsletter signups
+- Webinar registrations
+
+### Query Endpoints
+
+External systems can query Juryo data:
+
+#### Query Contacts
+
+`GET /api/webhook/contacts?email=john@example.com`
+
+**Parameters:**
+- `email` - Find by email
+- `phone` - Find by phone
+- `externalID` - Find by external system ID
+
+**Returns:** Contact with nested opportunities
+
+#### Query Opportunities
+
+`GET /api/webhook/opportunities?email=john@example.com`
+
+**Parameters:** Same as contacts
+
+**Returns:** Opportunities with nested contact data
+
+**Authentication:** `x-tenant-id` header required
+
+See [Webhook Configuration](/integrations/webhooks/configuration) for setup.
+
+## Integration Examples
+
+### Zapier Integration
+
+**Trigger:** Opportunity won in Juryo
+
+**Action:** Create deal in HubSpot
+
+**Setup:**
+1. Create outgoing webhook for `opportunity.won` event
+2. Point to Zapier webhook URL
+3. Configure Zapier to parse payload
+4. Map fields to HubSpot deal
+
+### Slack Notifications
+
+**Trigger:** High-value opportunity created
+
+**Setup:**
+1. Create Slack incoming webhook
+2. Configure Juryo webhook with Slack URL
+3. Filter events: `opportunity.created` with value > $10,000
+4. Format payload for Slack message
+
+**Payload Transform:**
+```json
+{
+  "text": "🎉 High-value opportunity!",
+  "blocks": [
+    {
+      "type": "section",
+      "text": {
+        "type": "mrkdwn",
+        "text": "*{{opportunity.title}}*\nValue: ${{opportunity.value}}\nContact: {{contact.name}}"
+      }
+    }
+  ]
+}
+```
+
+### CRM Sync
+
+**Bi-directional sync with external CRM:**
+
+**Juryo → CRM (Outgoing):**
+- Webhook on contact/opportunity events
+- Send updates to CRM API
+- Include `externalID` for matching
+
+**CRM → Juryo (Incoming):**
+- CRM sends webhook to Juryo
+- Use `POST /api/webhook/contact-opportunity`
+- Include CRM ID as `externalID`
+- Prevents duplicates via unique constraint
+
+## Monitoring & Debugging
+
+### Delivery Logs
+
+View webhook delivery attempts:
+
+1. Go to **Settings** → **Webhooks** → **Delivery Log**
+2. Filter by:
+   - Webhook name
+   - Status (success/failed)
+   - Date range
+3. Click delivery to see:
+   - Full request payload
+   - Response status and body
+   - Retry attempts
+   - Error messages
+
+### Testing Webhooks
+
+**Test Button:**
+Each webhook configuration has a "Test" button:
+1. Sends sample payload
+2. Shows response immediately
+3. Logs test delivery
+
+**Manual Testing:**
+Use curl to simulate webhooks:
+```bash
+# Test incoming webhook
+curl -X POST 'https://your-tenant.juryo.ai/api/webhook/contact-opportunity' \
+  -H 'x-tenant-id: your-tenant-uuid' \
+  -H 'Content-Type: application/json' \
+  -d '{"contact": {...}, "opportunity": {...}}'
+```
+
+See [Webhook Troubleshooting](/integrations/webhooks/troubleshooting) for common issues.
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Always verify webhook signatures">
+    **Why:** Prevent spoofed requests from malicious actors
+
+    **How:** Check `X-Juryo-Signature` header and validate HMAC
+  </Accordion>
+
+  <Accordion title="Handle idempotency">
+    **Why:** Webhooks may be delivered multiple times due to retries
+
+    **How:** Use event ID or timestamp to deduplicate. Process each event only once.
+  </Accordion>
+
+  <Accordion title="Respond quickly">
+    **Why:** Juryo times out after 30 seconds
+
+    **How:** Acknowledge receipt immediately (200 OK), process asynchronously
+  </Accordion>
+
+  <Accordion title="Log webhook data">
+    **Why:** Debugging and audit trail
+
+    **How:** Store raw webhook payloads and responses for troubleshooting
+  </Accordion>
+
+  <Accordion title="Use different webhooks per environment">
+    **Why:** Avoid test data in production systems
+
+    **How:** Separate webhook URLs for development, staging, production
+  </Accordion>
+</AccordionGroup>
+
+## Related Documentation
+
+<CardGroup cols={2}>
+  <Card
+    title="Webhook Configuration"
+    icon="gear"
+    href="/integrations/webhooks/configuration"
+  >
+    Set up and manage webhooks
+  </Card>
+  <Card
+    title="Webhook Security"
+    icon="shield-check"
+    href="/integrations/webhooks/security"
+  >
+    HMAC signatures and authentication
+  </Card>
+  <Card
+    title="Troubleshooting"
+    icon="wrench"
+    href="/integrations/webhooks/troubleshooting"
+  >
+    Common issues and solutions
+  </Card>
+  <Card
+    title="Automation Rules"
+    icon="wand-magic-sparkles"
+    href="/integrations/automation/automation-rules"
+  >
+    Trigger webhooks from automation rules
+  </Card>
+</CardGroup>

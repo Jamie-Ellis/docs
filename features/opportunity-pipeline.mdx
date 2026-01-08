@@ -1,0 +1,608 @@
+---
+title: "Opportunity Pipeline"
+description: "7-stage sales funnel with Kanban board, conversion tracking, and analytics"
+---
+
+## Overview
+
+Juryo's opportunity pipeline transforms your sales process from ad-hoc tracking to a systematic, data-driven approach. Each opportunity represents a potential case moving through a structured 7-stage funnel, providing visibility into your firm's business development efforts.
+
+<Info>
+**Key Benefits**
+- Visual Kanban board for pipeline management
+- Stage-by-stage conversion analytics
+- Automated progression based on communication activity
+- Revenue forecasting with probability weighting
+- Team performance tracking
+</Info>
+
+## The 7-Stage Pipeline
+
+Opportunities progress through seven distinct stages from initial inquiry to conversion or loss.
+
+### Pipeline Stages
+
+| Stage | Description | Key Activities | Success Criteria |
+|-------|-------------|----------------|------------------|
+| **1. Lead** | Initial inquiry received | Capture contact information, identify need | Contact information collected |
+| **2. Contacted** | First touchpoint made | Initial call/email, understand situation | Two-way communication established |
+| **3. Qualified** | Fit confirmed | Budget discussion, timeline confirmed, legal need validated | Qualified as viable opportunity |
+| **4. Appointment Booked** | Consultation scheduled | Calendar invite sent, reminder scheduled | Meeting on calendar |
+| **5. Proposal Sent** | Service agreement delivered | Proposal/contract sent, terms explained | Client reviewing proposal |
+| **6. Won** | Client signed | Agreement executed, ready to begin work | Convert to case |
+| **7. Lost** | Did not convert | Document reason, schedule follow-up (optional) | Opportunity closed |
+
+### Stage Progression
+
+```
+Lead → Contacted → Qualified → Appointment Booked → Proposal Sent → Won
+                                                                       ↓
+                                                                     Case
+
+                                    Lost ← (Can exit at any stage)
+```
+
+**Typical Conversion Rates:**
+- Lead → Contacted: 80-90%
+- Contacted → Qualified: 50-60%
+- Qualified → Appointment Booked: 70-80%
+- Appointment Booked → Proposal Sent: 85-95%
+- Proposal Sent → Won: 40-60%
+
+**Overall Lead → Won:** ~20-30% (industry average)
+
+## Creating Opportunities
+
+### Manual Creation
+
+#### From Contact Record
+
+1. Open a contact's profile
+2. Click **Create Opportunity**
+3. Fill in opportunity details:
+   - **Title**: Descriptive name (e.g., "H-1B Visa Application")
+   - **Stage**: Starting stage (usually "Lead")
+   - **Service Type**: Category of legal service
+   - **Legal Process**: Specific procedure
+   - **Estimated Value**: Expected revenue
+   - **Probability**: Likelihood of winning (0-100%)
+   - **Priority**: High, Medium, Low
+   - **Expected Close Date**: Target conversion date
+4. Click **Create Opportunity**
+
+#### From Opportunities Page
+
+1. Navigate to **Opportunities**
+2. Click **New Opportunity**
+3. Select or create contact
+4. Fill in opportunity details
+5. Click **Create**
+
+### Automatic Creation
+
+Opportunities can be created automatically from various sources:
+
+#### 1. Voice Call Analysis
+
+When Retell AI analyzes a call and detects opportunity potential:
+
+```javascript
+// Retell webhook creates opportunity automatically
+{
+  "contactPhone": "+1234567890",
+  "callAnalysis": {
+    "qualified": true,
+    "legalArea": "Immigration",
+    "urgency": "high"
+  }
+}
+
+// Result: Opportunity created with stage "Contacted"
+// Service type set based on conversation analysis
+```
+
+**Configuration:**
+- Retell AI agent trained to identify legal needs
+- Qualification criteria configured
+- See [Voice Integration](/integrations/voice/overview)
+
+#### 2. WhatsApp Conversations
+
+When WhatsApp analysis indicates opportunity:
+
+```
+User: "I need help with my work visa application"
+→ System analyzes message
+→ Creates contact if not exists
+→ Creates opportunity with stage "Lead"
+→ Links WhatsApp conversation to opportunity
+```
+
+#### 3. External Webhooks
+
+Website forms or CRM systems can create opportunities:
+
+```bash
+curl -X POST 'https://api.juryo.ai/api/webhook/contact-opportunity' \
+  -H 'x-tenant-id: your-tenant-uuid' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "contact": {
+      "firstName": "Maria",
+      "lastName": "Rodriguez",
+      "email": "maria@example.com",
+      "phone": "+1234567890"
+    },
+    "opportunity": {
+      "title": "Green Card Application",
+      "serviceType": "Immigration",
+      "legalProcess": "EB-2 Green Card",
+      "stage": "lead",
+      "estimatedValue": 15000,
+      "priority": "high",
+      "source": "website"
+    }
+  }'
+```
+
+See [Webhook Integration](/integrations/webhooks/configuration) for setup.
+
+## Kanban Board View
+
+The Opportunities page displays your pipeline as an interactive Kanban board.
+
+### Board Layout
+
+```
+┌─────────────┬─────────────┬─────────────┬─────────────┐
+│    Lead     │  Contacted  │  Qualified  │ Appointment │
+│             │             │             │   Booked    │
+│ ┌─────────┐ │ ┌─────────┐ │ ┌─────────┐ │ ┌─────────┐ │
+│ │ Opp #1  │ │ │ Opp #4  │ │ │ Opp #7  │ │ │ Opp #10 │ │
+│ │ $5,000  │ │ │ $12,000 │ │ │ $8,000  │ │ │ $15,000 │ │
+│ └─────────┘ │ └─────────┘ │ └─────────┘ │ └─────────┘ │
+│ ┌─────────┐ │ ┌─────────┐ │             │             │
+│ │ Opp #2  │ │ │ Opp #5  │ │             │             │
+│ │ $3,500  │ │ │ $10,000 │ │             │             │
+│ └─────────┘ │ └─────────┘ │             │             │
+└─────────────┴─────────────┴─────────────┴─────────────┘
+
+┌─────────────┬─────────────┬─────────────┐
+│  Proposal   │     Won     │    Lost     │
+│    Sent     │             │             │
+│ ┌─────────┐ │ ┌─────────┐ │ ┌─────────┐ │
+│ │ Opp #11 │ │ │ Opp #14 │ │ │ Opp #16 │ │
+│ │ $20,000 │ │ │ $18,000 │ │ │ $7,000  │ │
+│ └─────────┘ │ └─────────┘ │ └─────────┘ │
+└─────────────┴─────────────┴─────────────┘
+```
+
+### Drag & Drop
+
+**Moving Opportunities:**
+1. Click and hold opportunity card
+2. Drag to target stage column
+3. Drop to update stage
+4. System automatically:
+   - Updates stage timestamp
+   - Logs activity
+   - Triggers automation rules (if configured)
+   - Recalculates analytics
+
+**Multi-select:**
+- Hold Ctrl/Cmd and click multiple opportunities
+- Drag selection to move all at once
+
+### Card Information
+
+Each opportunity card displays:
+- **Title** and contact name
+- **Estimated value** (revenue)
+- **Priority indicator** (color-coded)
+- **Days in current stage**
+- **Legal service type** icon
+- **Assigned team member** avatar
+
+### Filters & Views
+
+**Filter By:**
+- Service type (Immigration, Corporate, Family, etc.)
+- Legal process (H-1B Visa, LLC Formation, etc.)
+- Assigned team member
+- Priority level
+- Date range
+- Source channel
+
+**Saved Views:**
+- My Opportunities
+- High Priority
+- Overdue (past expected close date)
+- This Month's Opportunities
+- Won This Quarter
+
+## Opportunity Details
+
+### Information Sections
+
+#### Overview
+
+**Core Details:**
+- Title and description
+- Associated contact (clickable link)
+- Current stage and status
+- Created date and last updated
+- Source and channel attribution
+- External ID (for CRM sync)
+
+**Financial Information:**
+- Estimated value
+- Probability percentage (0-100%)
+- Weighted value (estimated × probability)
+- Expected close date
+- Actual close date (if won/lost)
+
+**Categorization:**
+- Service type (Immigration, Corporate, etc.)
+- Legal area
+- Legal process (specific procedure)
+- Priority (High, Medium, Low)
+
+#### Communications
+
+All interactions related to this opportunity:
+- Linked WhatsApp conversations
+- Retell AI call transcripts
+- Manual communication entries
+- Email correspondence
+- Meeting notes
+
+**Communication Timeline:**
+```
+Jan 8, 2025  3:45 PM  WhatsApp Message (Inbound)
+                      "Hello, I need help with my visa"
+
+Jan 8, 2025  4:00 PM  WhatsApp Message (Outbound)
+                      "Thank you for reaching out. Let's schedule a consultation."
+
+Jan 9, 2025  2:00 PM  Voice Call (Inbound) - 15 min
+                      Qualified: Yes | Appointment: Scheduled
+```
+
+#### Tasks & Activities
+
+**Associated Tasks:**
+- Follow-up reminders
+- Document collection
+- Proposal preparation
+- Contract review
+- Scheduled calls
+
+**Activity Log:**
+- Stage changes
+- Field updates
+- Task completions
+- Communication events
+- Team member actions
+
+#### Documents
+
+Proposal documents and correspondence:
+- Service agreements
+- Fee schedules
+- Proposal presentations
+- Signed contracts
+- Supporting materials
+
+## Stage Management
+
+### Manual Stage Updates
+
+**Via Kanban Board:**
+Drag opportunity to new stage column
+
+**Via Opportunity Detail:**
+1. Open opportunity
+2. Click stage dropdown
+3. Select new stage
+4. Optionally add notes
+5. Click **Update Stage**
+
+### Automatic Stage Progression
+
+Opportunities can advance automatically based on activities:
+
+**Communication-Based:**
+- Retell AI call with "appointment booked" → Moves to "Appointment Booked"
+- Email sent with proposal attachment → Moves to "Proposal Sent"
+- Contract signed webhook received → Moves to "Won"
+
+**Time-Based:**
+- No activity for 30 days in "Lead" → Automation notification
+- 7 days past expected close date → Flag as overdue
+
+**Activity-Based:**
+- Task "Initial consultation" completed → Suggest move to "Qualified"
+- Task "Send proposal" completed → Suggest move to "Proposal Sent"
+
+### Stage Exit Criteria
+
+**Moving to "Won":**
+- Service agreement must be signed (or marked as signed)
+- Payment terms must be established
+- Opportunity converts to a case automatically
+
+**Moving to "Lost":**
+- Must select loss reason:
+  - Price too high
+  - Chose another firm
+  - No longer needs service
+  - Timing not right
+  - Unresponsive
+  - Other (with notes)
+- Optionally schedule follow-up date
+- Contact remains for future opportunities
+
+## Conversion to Case
+
+When an opportunity is won, it converts to an active case.
+
+### Conversion Process
+
+1. **Opportunity reaches "Won" stage**
+2. Click **Convert to Case** button
+3. System pre-fills case information:
+   - Client: Opportunity's contact (auto-updated to "Client" role)
+   - Legal Area: From opportunity service type
+   - Legal Process: From opportunity details
+   - Estimated Value: From opportunity value
+4. Add case-specific details:
+   - Assigned attorney
+   - Case status (typically "Consultation")
+   - Important dates
+   - Case notes
+5. Click **Create Case**
+
+**Automatic Actions:**
+- Contact role updated from "Qualified Lead" to "Client"
+- Opportunity status set to "Converted to Case"
+- Case ID linked to opportunity
+- Communication history transferred
+- Tasks transferred to case
+
+**Opportunity Record:**
+- Remains in system for historical tracking
+- Shows link to created case
+- Included in won opportunity analytics
+- Revenue credited to original source
+
+## Opportunity Analytics
+
+### Pipeline Overview
+
+**Key Metrics Dashboard:**
+- Total opportunities by stage (count and value)
+- Weighted pipeline value (sum of estimated × probability)
+- Average deal size
+- Average sales cycle length
+- Win rate (won ÷ (won + lost))
+
+**Visual Representations:**
+- Funnel chart showing drop-off at each stage
+- Bar chart of opportunities by stage
+- Line chart of pipeline value over time
+- Pie chart of opportunities by service type
+
+### Conversion Analysis
+
+**Stage-by-Stage Conversion:**
+```
+Lead → Contacted:        85% (120 → 102)
+Contacted → Qualified:   55% (102 → 56)
+Qualified → Appointment: 75% (56 → 42)
+Appointment → Proposal:  90% (42 → 38)
+Proposal → Won:          45% (38 → 17)
+
+Overall Lead → Won:      14% (120 → 17)
+```
+
+**Bottleneck Identification:**
+- Stages with lowest conversion rates
+- Stages with longest average duration
+- Drop-off points requiring attention
+
+### Time in Stage Analysis
+
+**Average Duration:**
+- Lead: 2 days
+- Contacted: 5 days
+- Qualified: 7 days
+- Appointment Booked: 3 days
+- Proposal Sent: 10 days
+- **Total Cycle:** ~27 days average
+
+**Opportunity Age Distribution:**
+- 0-7 days: 45% of pipeline
+- 8-30 days: 35% of pipeline
+- 31-60 days: 15% of pipeline
+- 60+ days: 5% of pipeline (review for stale opportunities)
+
+### Source Attribution
+
+**Opportunities by Source:**
+- Website: 35% ($245,000 pipeline)
+- Referrals: 25% ($180,000 pipeline)
+- WhatsApp: 20% ($140,000 pipeline)
+- Voice Calls: 15% ($105,000 pipeline)
+- Other: 5% ($35,000 pipeline)
+
+**Conversion Rate by Source:**
+- Referrals: 35% win rate (highest)
+- Voice Calls: 28% win rate
+- Website: 22% win rate
+- WhatsApp: 18% win rate
+
+**ROI Analysis:**
+Calculate cost per acquisition vs. lifetime value by source
+
+### Team Performance
+
+**By Team Member:**
+- Opportunities owned
+- Total pipeline value
+- Win rate
+- Average deal size
+- Average sales cycle
+- Conversion rate at each stage
+
+**Leaderboard:**
+Rank team members by:
+- Most opportunities won
+- Highest pipeline value
+- Best win rate
+- Fastest close time
+
+## Revenue Forecasting
+
+### Weighted Pipeline
+
+Calculate expected revenue using probability:
+
+```
+Opportunity 1: $10,000 × 80% = $8,000 weighted
+Opportunity 2: $15,000 × 50% = $7,500 weighted
+Opportunity 3: $20,000 × 90% = $18,000 weighted
+
+Total Weighted Pipeline: $33,500
+```
+
+**Probability by Stage (typical):**
+- Lead: 10%
+- Contacted: 20%
+- Qualified: 40%
+- Appointment Booked: 60%
+- Proposal Sent: 80%
+- Won: 100%
+
+### Forecast Reports
+
+**This Month Forecast:**
+- Opportunities expected to close this month
+- Weighted value
+- Confidence level (based on stage)
+
+**Quarterly Forecast:**
+- Q1, Q2, Q3, Q4 projections
+- Historical win rate applied
+- Trend analysis
+
+**By Service Type:**
+- Immigration: $150,000 forecast
+- Corporate: $120,000 forecast
+- Family Law: $80,000 forecast
+
+## Automation with Opportunities
+
+### Common Automation Rules
+
+**Example 1: Stale Opportunity Alert**
+```
+Trigger: Opportunity in "Contacted" stage for 14+ days
+Action: Create task "Follow up with contact" assigned to owner
+```
+
+**Example 2: High-Value Opportunity Notification**
+```
+Trigger: Opportunity created with value > $25,000
+Action: Send Slack notification to managing partner
+```
+
+**Example 3: Proposal Follow-up**
+```
+Trigger: Opportunity moved to "Proposal Sent"
+Action: Create task "Follow up on proposal" due in 3 days
+```
+
+**Example 4: Won Opportunity Celebration**
+```
+Trigger: Opportunity moved to "Won"
+Actions:
+  - Send congratulations email to team
+  - Update CRM via webhook
+  - Create case automatically
+  - Send client welcome email
+```
+
+See [Automation Rules](/integrations/automation/automation-rules) for setup.
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Update opportunities regularly">
+    **Why:** Stale pipeline data leads to inaccurate forecasts and missed opportunities.
+
+    **How:** Review pipeline weekly. Update stages promptly. Set automation reminders for inactive opportunities.
+  </Accordion>
+
+  <Accordion title="Track all touchpoints">
+    **Why:** Complete communication history improves conversion rates and provides valuable insights.
+
+    **How:** Use WhatsApp/voice integrations for automatic logging. Manually log email and in-person meetings.
+  </Accordion>
+
+  <Accordion title="Use accurate estimated values">
+    **Why:** Revenue forecasts depend on realistic value estimates. Inflated values create false expectations.
+
+    **How:** Base estimates on standard fee schedules. Update values as scope becomes clearer.
+  </Accordion>
+
+  <Accordion title="Adjust probabilities by stage">
+    **Why:** Not all "Proposal Sent" opportunities have 80% probability. Adjust based on specific circumstances.
+
+    **How:** Consider client responsiveness, budget fit, competition, urgency when setting probability.
+  </Accordion>
+
+  <Accordion title="Document loss reasons">
+    **Why:** Understanding why you lose helps improve processes and qualify better.
+
+    **How:** Always select loss reason and add notes. Review quarterly to identify patterns.
+  </Accordion>
+
+  <Accordion title="Set realistic close dates">
+    **Why:** Overdue opportunities clutter pipeline and reduce forecast accuracy.
+
+    **How:** Base close dates on average cycle time for similar opportunities. Update as circumstances change.
+  </Accordion>
+</AccordionGroup>
+
+## Related Features
+
+<CardGroup cols={2}>
+  <Card
+    title="Contact Management"
+    icon="users"
+    href="/features/contact-management"
+  >
+    Manage contacts linked to opportunities
+  </Card>
+  <Card
+    title="Case Management"
+    icon="scale-balanced"
+    href="/features/case-management"
+  >
+    Convert won opportunities to cases
+  </Card>
+  <Card
+    title="Opportunity Analytics API"
+    icon="chart-line"
+    href="/api-reference/analytics/opportunity-analytics"
+  >
+    Retrieve funnel metrics via API
+  </Card>
+  <Card
+    title="Automation Rules"
+    icon="wand-magic-sparkles"
+    href="/integrations/automation/automation-rules"
+  >
+    Automate opportunity workflows
+  </Card>
+</CardGroup>
