@@ -210,8 +210,8 @@
     }
   },
   "logo": {
-    "light": "/logo/light.svg",
-    "dark": "/logo/dark.svg"
+    "light": "/logo/juryo-logo.png",
+    "dark": "/logo/juryo-logo.png"
   },
   "navbar": {
     "links": [
